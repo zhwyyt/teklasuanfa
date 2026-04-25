@@ -1,16 +1,22 @@
 using System.Text.Json;
-using TeklaBodyBracketRecognition.App;
-using TeklaBodyBracketRecognition.Core.Algorithms;
+namespace TeklaBodyBracketRecognition.App;
 
-var analyzer = new AssemblyAnalyzer();
-var input = SampleAssemblyFactory.CreateBuiltUpHWithBracket();
-var result = analyzer.Analyze(input);
-
-var json = JsonSerializer.Serialize(
-    result,
-    new JsonSerializerOptions
+internal static class Program
+{
+    private static readonly JsonSerializerOptions JsonOptions = new()
     {
+        IncludeFields = true,
         WriteIndented = true
-    });
+    };
 
-Console.WriteLine(json);
+    private static int Main(string[] args)
+    {
+        if (AppEarlyCommandDispatcher.TryRun(args, Console.Out, Console.Error, out var earlyExitCode))
+        {
+            return earlyExitCode;
+        }
+
+        return OfflineRecognitionApp.Run(args, JsonOptions, Console.Out, Console.Error);
+    }
+
+}

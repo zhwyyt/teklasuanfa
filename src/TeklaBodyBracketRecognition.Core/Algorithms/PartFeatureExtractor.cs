@@ -61,6 +61,13 @@ public sealed class PartFeatureExtractor
             BooleanAddCount = part.BooleanAddCount,
             ShopWeldDegree = part.ShopWeldDegree,
             SiteWeldDegree = part.SiteWeldDegree,
+            SemanticRole = part.SemanticRole,
+            SemanticRoleScore = part.SemanticRoleScore,
+            NearMemberStart = part.NearMemberStart,
+            NearMemberEnd = part.NearMemberEnd,
+            OuterSideCandidate = part.OuterSideCandidate,
+            Planarity = part.Planarity,
+            SolidEdges = (part.SolidEdges ?? Array.Empty<LineSegment3>()).ToArray(),
             IsTinyPart = part.Volume < _options.TinyPartVolumeThreshold,
             LikelyConnectionPart = part.HoleLikeFeatureCount >= 4 && sortedDims[0] < 0.25 * (sortedDims[0] + sortedDims[1] + sortedDims[2]),
             AspectRatio = sortedDims[1] <= 1e-6 ? sortedDims[0] : sortedDims[0] / sortedDims[1]

@@ -1,0 +1,7 @@
+"Priority","Track","AssemblyId","SourceFile","PredictedBodyFamily","PredictedBracketPartGroups","SuggestedUse","NeedHasBracket","NeedBracketPartGroups","NeedBodyFamily","Notes"
+"P1","GKZ positive","262948748","member_T2-3GKZ-5.json","BuiltUpH","262317231,262317238","GKZ 真牛腿优先","yes","yes","optional","优先确认是否真有牛腿"
+"P1","GKZ positive","262960295","member_T2-3GKZ-3.json","BuiltUpH","261599364,261599370","GKZ 真牛腿优先","yes","yes","optional","优先确认是否真有牛腿"
+"P1","GKZ positive","262970541","member_T2-3GKZ-15.json","BuiltUpH","261594522,261594528","GKZ 真牛腿优先","yes","yes","optional","优先确认是否真有牛腿"
+"P1","BuiltUpT hard negative","260925586","member_T2-3GL-50.json","BuiltUpT","262077056,262077064,262077072,262077079,262077110","BuiltUpT 硬负例优先","yes","yes","optional","优先确认是否其实没有牛腿"
+"P1","BuiltUpT hard negative","260925609","member_T2-3GL-53.json","BuiltUpT","262077208,262077216,262077224,262077262","BuiltUpT 硬负例优先","yes","yes","optional","优先确认是否其实没有牛腿"
+"P1","BuiltUpT hard negative","260925691","member_T2-3GL-22.json","BuiltUpT","262074364,262074372,262074380,262074418","BuiltUpT 硬负例优先","yes","yes","optional","优先确认是否其实没有牛腿"
