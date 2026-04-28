@@ -1,5 +1,16 @@
 # 主材识别基座重构任务清单
 
+> 历史档案说明
+>
+> 本文档已转为历史累计任务档案，不再作为当前活跃执行真源。
+>
+> 当前请优先使用：
+>
+> - [PROJECT_STATUS_V2.zh-CN.md](</I:/autoteklasuanfa/PROJECT_STATUS_V2.zh-CN.md>)
+> - [PROJECT_TASKLIST_V2.zh-CN.md](</I:/autoteklasuanfa/PROJECT_TASKLIST_V2.zh-CN.md>)
+> - [PROJECT_REFOCUS_PLAN.zh-CN.md](</I:/autoteklasuanfa/PROJECT_REFOCUS_PLAN.zh-CN.md>)
+> - [PROJECT_ARCHIVE_NOTICE.zh-CN.md](</I:/autoteklasuanfa/PROJECT_ARCHIVE_NOTICE.zh-CN.md>)
+
 ## 文档目的
 
 本文档把 [MAIN_BODY_FOUNDATION_REBUILD_PLAN.zh-CN.md](</I:/autoteklasuanfa/MAIN_BODY_FOUNDATION_REBUILD_PLAN.zh-CN.md>) 拆成可执行任务清单。
@@ -27,6 +38,100 @@
 
 ## 当前状态
 
+- `2026-04-28` 已把阶段 6 最终家族判定对上游 `SourceMemberMainClassCode` 的运行时依赖摘除：
+  - 已确认此前真正参与最终 `BOX / H / 变截面 BOX / deferred H hint` 判定的核心位置在
+    [BodyFamilyDefinitionEvaluator.cs](</I:/autoteklasuanfa/src/TeklaBodyBracketRecognition.App/BodyFamilyDefinitionEvaluator.cs>)
+  - 当前已改为：
+    - 上游 `SourceMemberMainClassCode` 只保留为 audit / sidecar 字段
+    - 最终家族归属只吃下游工程定义链：
+      - `LeadClause`
+      - `LeadClauseVerdict / PromotionReadiness`
+      - `BodyDescriptorFamily / BodyDescriptorSectionType`
+      - `ImportSynthesisKind`
+  - 已执行 `dotnet build I:\autoteklasuanfa\TeklaBodyBracketRecognition.sln`
+    - `0` warning
+    - `0` error
+  - 当前下一步建议：
+    - 若后续还要继续收口，可再把 output 文案中“上游稳定语义”这类历史措辞继续清成“下游工程定义链”
+- `2026-04-28` 已完成一轮上游 `TeklaSectionClassifier` 根因修正，并确认这不是下游临时防守：
+  - 已修 `Tekla2017MemberExtractor.BuildGuidePolyline(...)`：
+    - 从“按端点投影排序后硬连线”
+    - 改为“按纵向边构图 + 主组件筛选 + 平行组件同里程取中点”的真实 centerline 重建
+  - 已新增 `LongitudinalAxisResolver.cs`，并把：
+    - `DefaultSectionSampler`
+    - `DefaultAnomalyDetector`
+    - `ApproximateSectionIntersectionService`
+    - 统一切到优先消费 `AxisSegments`
+  - 已修 `ApproximateSectionIntersectionService.BuildFeatures(...)`：
+    - 不再用 `wallCandidates >= 4`
+    - 不再用 `2 flange + 2 web => enclosure=0.45`
+    - 改为“边界覆盖 + 四角接触 + 横竖向边界资格”闭环证据
+  - 已在临时重建缓存
+    [run_body_bracket_real_04_upstream_axis_rebuilt_v2](</I:/autoteklasuanfa/.tmpdata/run_body_bracket_real_04_upstream_axis_rebuilt_v2>)
+    上用上游 Runner 离线重算确认：
+    - `T3-1GKZ-3`：仍稳定 `BOX`
+    - `T3-1HXZ-2`：回到 `IRREGULAR + review`
+    - `T3-2YPGL-5`：稳定 `BOX`
+  - 当前这一步已把上游“轴线导出 / 采样 / enclosure”三层口径拉齐
+  - 下一步优先级已收敛为：
+    - 用真实 Tekla 模型重新正式导出一份缓存
+    - 再跑下游全链路，确认正式导出物与临时重建缓存一致
+- `2026-04-28` 已继续用 [run_body_bracket_real_11](</I:/xingcaisuanfa/cache/run_body_bracket_real_11>) 验证上游纵向轴选择层，并补上第二层上游根因：
+  - 已确认 `T3-4GZ-7 / T3-4GZ-10` 的真实问题不是下游条款，而是：
+    - 主件本体是 `Beam PL16*1000`
+    - 但旧上游 guide 候选只认 `PolyBeam`
+    - 导致短附件被误选为 longitudinal guide
+  - 已把上游 `HasUsableGuideSegments(...)` 扩到：
+    - `PolyBeam + Beam`
+  - 已用临时重建缓存
+    [run_body_bracket_real_11_upstream_axis_rebuilt_v1](</I:/autoteklasuanfa/.tmpdata/run_body_bracket_real_11_upstream_axis_rebuilt_v1>)
+    复跑确认：
+    - `T3-4GZ-7 / T3-4GZ-10` 已回到 `BOX`
+    - `T3-4HXZ-4 / T3-4HXZ-15` 仍保持 `IRREGULAR + review`
+  - 当前这一步说明：
+    - 上游 longitudinal 相关 root cause 现在已经覆盖到两层：
+      - guide 重建
+      - guide 候选 part 选择
+  - 当前下一步优先级进一步收敛为：
+    - 从真实 Tekla 模型重新正式导出一份带最新上游代码的缓存
+    - 用正式导出物再复跑 `real_11`
+    - 然后再决定是否继续扩展到更多 `GZ / GKZ / YPGL / GL` 组合样本
+- `2026-04-28` 已把 `ClosedLoopCandidate` 的粗拓扑判据继续收紧为“双证据闭环”：
+  - 当前 [SectionClosedLoopEvidence.cs](</I:/autoteklasuanfa/src/TeklaBodyBracketRecognition.Core/Algorithms/SectionClosedLoopEvidence.cs>) 已改成两级判定：
+    - `endpoint-cycle`
+    - `convex-hull boundary coverage`
+  - 已对真实 [run_body_bracket_real_04_true_closed_loop_check_v3](/I:/autoteklasuanfa/.tmpresults/run_body_bracket_real_04_true_closed_loop_check_v3) 复跑确认：
+    - `T3-1GKZ-3` 仍稳定为：
+      - `ClosedLoopStationCount = 5`
+      - `CoarseMainClass = BOX`
+    - `T3-1HXZ-2` 仍稳定为：
+      - `ClosedLoopStationCount = 0`
+      - `CoarseMainClass = NONE`
+    - `T3-2YPGL-5` 当前仍未回到 `BOX`
+  - 当前这一步的净效果是：
+    - 已把“假围合误报”继续收住
+    - 残余问题已收敛到“折线变截面箱体为何在 priority station 上仍取不到可证明围合”
+- `2026-04-27` 已完成一轮低风险 `MainClass` 直达映射校正：
+  - 根因已确认不是标准角钢识别链失效，而是下游 `DefinitionClauseDecisionFullRunSourceCollector` 的源 `MainClass` 映射表与上游 `TeklaSectionClassifier.MemberClass` 枚举脱节
+  - 已确认上游枚举为：
+    - `H=1 / Box=2 / T=3 / Cross=4 / Angle=5 / Pipe=6 / Irregular=7`
+  - 已修正下游映射：
+    - `4 => CROSS`
+    - `5 => L`
+    - `6 => PIPE`
+  - 已补齐粗分类观察层 `CROSS` 中文标签，避免 sidecar/Excel 再把十字类显示成 `NONE`
+  - 已对真实 [run_body_bracket_real_04_mainclass_mapping_fix_check](/I:/autoteklasuanfa/.tmpresults/run_body_bracket_real_04_mainclass_mapping_fix_check) 复跑确认：
+    - `T3-2GL-78` 已从旧错误的 `PIPE` 改回 `L`
+    - `BodyDescriptorSectionType = STANDARD_ANGLE`
+    - `run_body_bracket_real_04` 中 `34` 条角钢样本均已稳定显示为 `L`
+  - 当前这一步只修“属性直达”映射口径，不改阶段 5/6 规则和证据链
+- `2026-04-27` 已把“属性直达构件不走粗分类”落实到观察层：
+  - 当前仅对 `BodyDescriptorFamily = StandardSection` 生效
+  - 这类构件在粗分类 sidecar 中不再产出粗主类，而是直接落 `ATTRIBUTE_DIRECT_BYPASS`
+  - 已对真实 [run_body_bracket_real_04_attribute_direct_bypass_check](/I:/autoteklasuanfa/.tmpresults/run_body_bracket_real_04_attribute_direct_bypass_check) 复跑确认：
+    - `T3-2GL-78` 当前为 `L + STANDARD_ANGLE + ATTRIBUTE_DIRECT_BYPASS`
+    - `run_body_bracket_real_04` 内 `34` 条 `STANDARD_ANGLE` 样本全部旁路粗分类
+  - 当前这一步仍只收口“属性直达 vs 粗分类观察”的边界，不扩展到 built-up H/BOX 主链
 - `2026-04-25` 已把仓库内残留的旧启发式主体识别链从运行时主线中清除：
   - [Program.cs](</I:/autoteklasuanfa/src/TeklaBodyBracketRecognition.App/Program.cs>)
   - [BodyFamilyDefinitionEvaluator.cs](</I:/autoteklasuanfa/src/TeklaBodyBracketRecognition.App/BodyFamilyDefinitionEvaluator.cs>)
@@ -1709,3 +1814,31 @@
 > 2026-04-23 12:22 阶段 2 已继续把共享范围推进到 command handler 解析层：新增 `BodyCandidatePartitionConservativeFixtureCommandHandlerSupport`，并让 `package-audit`、`validation`、`validation-bundle`、`stage2-aggregate` 四条入口共用命令命中判断与 `--output-root` 解析逻辑；最小 `dotnet build` 与四条 smoke 均继续通过。下一步优先评估是否还值得继续把四个 dispatcher hook 的 console 输出层也收成共享 formatter，还是停在当前边界，把更多精力留给真正还未共享的业务语义层。
 > 2026-04-23 12:33 阶段 2 已继续把共享范围推进到 dispatcher console 输出层：新增 `BodyCandidatePartitionConservativeFixtureDispatcherOutputFormatter`，并让 `package-audit`、`validation`、`validation-bundle`、`stage2-aggregate` 四个 dispatcher hook 共用 header、键值行与可选字段输出逻辑；最小 `dotnet build` 与四条 smoke 均继续通过。当前这组入口的壳层重复已经基本收干净，下一步更建议停在这里，把后续时间转回业务语义层，除非你明确希望继续压缩 hook/handler 的结构样板。
 > 2026-04-23 12:49 `DefinitionClause` 主线已真正推进到“validation bundle 并回旧 demo/sidecar 导出链”：当前 `DefinitionClauseDecisionSidecarWorkflow` 已新增 `WriteDefaultFixtureArtifactsWithValidationBundle(...)`，`DefinitionClauseDecisionDemoWorkflowRunner` 会在旧 sidecar 基线之上同步导出 `definition-clause-decision-bridge-validation-bundle/`；`DefinitionClauseDecisionSidecarManifest`、`DefinitionClauseDecisionDemoExportService`、`DefinitionClauseDecisionDemoCommandHandler`、`DefinitionClauseDecisionDemoAppEntry`、`DefinitionClauseDecisionDemoOutputReadmeBuilder`、`DefinitionClauseDecisionDemoOutputValidator` 与 validation report 也已补入 bundle 路径和存在性检查。真实 smoke `definition-clause-decision-demo-smoke-20260423-v2` 下，旧 fixture sidecar 与新增 bundle 顶层/mapper/effect-adapter 工件已全部通过验证，`AllExpectedFilesExist=True`。下一步优先把同样的并线思路继续推进到“旧 bridge fixtures / runner / reportBuilder 是否要直接消费新 mapper/effect-adapter 结果”，而不是再让 `DefinitionClauseDecisionBridge.cs` 这条旧直判骨架长期停留在完全独立的测试入口。
+
+## 2026-04-27 纯粗拓扑观察层
+
+- 已完成第一轮独立重建，当前边界固定为：
+  - 属性直达层保持独立
+  - 粗分类层独立重建，只做观察
+  - 最终 `body-family-proof` 不消费这层结果
+- 当前粗分类规则主线：
+  - 小板粗排除
+  - 主板候选集合
+  - 多切片拓扑聚合
+  - 输出 `BOX / H / PRIMARY_PLATE_BODY / NONE`
+- 当前已完成：
+  - 新 coarse observation workflow 接入 sidecar coordinator
+  - Excel 导出新增 `coarse-main-class-observation.xlsx`
+  - `run_body_bracket_real_06_coarse_topology_rebuild_v2` 已复跑
+  - `run_body_bracket_real_04_coarse_topology_rebuild_v2` 已复跑
+  - `T3-2YPGL-18` 在 `real_04` 中已稳定回到 `BOX`
+- 当前下一步优先级：
+  - 先围绕 `T3-2YPGL-5` 继续拆清当前漏报层级：
+    - 是 `priority station` 选取过窄
+    - 还是折线局部截面在当前截取方式下确实没有形成可证明围合
+    - 还是需要单独的“斜围合 / 变截面 box”粗拓扑证据
+  - 再扫 `real_06` 中剩余 `SourceMemberMainClass = BOX` 但粗分类未落 `BOX` 的样本
+  - 重点区分：
+    - `NO_ELIGIBLE_CANDIDATE_SET`
+    - `TOPOLOGY_CONSENSUS_NOT_REACHED`
+  - 只有在确认还能明显提升普适性时，再收第三轮候选集/切片聚合规则
