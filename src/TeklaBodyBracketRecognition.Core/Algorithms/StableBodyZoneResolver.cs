@@ -78,6 +78,7 @@ public sealed class StableBodyZoneResolver
             var endDensity = (double)endCount / total;
             var localDensity = (double)localCount / total;
             var withinTrimmedCore = midpoint >= trimMin && midpoint <= trimMax;
+            var hasMainBodyContinuity = HasMainBodyContinuity(overlapping, min, max);
 
             StableBodyZoneKind zoneKind;
             var reasons = new List<string>();
@@ -107,6 +108,13 @@ public sealed class StableBodyZoneResolver
                 {
                     reasons.Add("LOW_LOCAL_COMPLEXITY");
                 }
+            }
+            else if (hasMainBodyContinuity)
+            {
+                zoneKind = StableBodyZoneKind.Stable;
+                confidence = 0.72;
+                reasons.Add("MAIN_BODY_CONTINUITY_OVERRIDE");
+                reasons.Add("HIGH_BODY_CANDIDATE_COVERAGE");
             }
             else if (localCount > 0 || localDensity > 0.50)
             {
@@ -144,6 +152,27 @@ public sealed class StableBodyZoneResolver
             AssemblyAxisIntervalMax = Math.Round(assemblyMax, 3),
             Zones = MergeNeighborZones(zones)
         };
+    }
+
+    private static bool HasMainBodyContinuity(
+        IReadOnlyList<BodyCandidatePartitionItem> overlapping,
+        double intervalMin,
+        double intervalMax)
+    {
+        const double coverageFloor = 0.55d;
+        const double intervalTolerance = 1e-6;
+
+        var continuousBodyCandidates = overlapping
+            .Where(
+                item =>
+                    item.PartitionClass == BodyCandidatePartitionClass.BodyCandidate &&
+                    item.NearStableZone &&
+                    item.LongitudinalCoverageEstimate >= coverageFloor &&
+                    item.AxisIntervalMin <= intervalMin + intervalTolerance &&
+                    item.AxisIntervalMax >= intervalMax - intervalTolerance)
+            .ToArray();
+
+        return continuousBodyCandidates.Length >= 2;
     }
 
     private static IReadOnlyList<StableBodyZone> MergeNeighborZones(IReadOnlyList<StableBodyZone> zones)

@@ -54,6 +54,31 @@ PROFILE_ROW_COLUMNS = [
     ("SourceFile", "源文件"),
 ]
 
+COARSE_MAIN_CLASS_ROW_COLUMNS = [
+    ("MemberId", "构件编号"),
+    ("AssemblyId", "装配编号"),
+    ("SourceMemberMainClassLabelZh", "属性直达主类"),
+    ("BodyDescriptorFamily", "主体描述家族"),
+    ("BodyDescriptorSectionType", "主体描述截面类型"),
+    ("LongitudinalTypeLabelZh", "长度方向类型"),
+    ("CoarseMainClassLabelZh", "粗主类"),
+    ("CoarseMainClassSubtypeLabelZh", "粗子类"),
+    ("CoarseMainClassConfidence", "粗分类置信度"),
+    ("CandidatePartCount", "主板候选数量"),
+    ("CandidatePartIds", "主板候选零件"),
+    ("EligibleStationCount", "有效切片数"),
+    ("BoxStationCount", "箱体切片数"),
+    ("HStationCount", "H类切片数"),
+    ("PrimaryPlateStationCount", "主板切片数"),
+    ("ClosedLoopStationCount", "闭环切片数"),
+    ("BoxStationRatio", "箱体切片占比"),
+    ("HStationRatio", "H类切片占比"),
+    ("PrimaryPlateStationRatio", "主板切片占比"),
+    ("ClosedLoopStationRatio", "闭环切片占比"),
+    ("CoarseMainClassReasonLabelZh", "粗分类原因"),
+    ("SourceFile", "源文件"),
+]
+
 SUMMARY_SECTIONS = [
     ("StatusBreakdown", "状态分布"),
     ("FamilyBreakdown", "家族分布"),
@@ -158,6 +183,7 @@ def main() -> int:
 
     family_json = output_dir / "body-family-proof.json"
     profile_json = output_dir / "body-profile-resolution.json"
+    coarse_json = output_dir / "coarse-main-class-observation.json"
 
     if not family_json.exists() or not profile_json.exists():
         print("Required JSON artifacts are missing. Expecting body-family-proof.json and body-profile-resolution.json.")
@@ -165,12 +191,17 @@ def main() -> int:
 
     family_xlsx = output_dir / "body-family-proof.xlsx"
     profile_xlsx = output_dir / "body-profile-resolution.xlsx"
+    coarse_xlsx = output_dir / "coarse-main-class-observation.xlsx"
 
     _export_workbook(family_json, family_xlsx, "家族判定汇总", "家族判定明细", FAMILY_ROW_COLUMNS)
     _export_workbook(profile_json, profile_xlsx, "型材细分汇总", "型材细分明细", PROFILE_ROW_COLUMNS)
+    if coarse_json.exists():
+        _export_workbook(coarse_json, coarse_xlsx, "粗分类汇总", "粗分类明细", COARSE_MAIN_CLASS_ROW_COLUMNS)
 
     print(f"Generated: {family_xlsx}")
     print(f"Generated: {profile_xlsx}")
+    if coarse_json.exists():
+        print(f"Generated: {coarse_xlsx}")
     return 0
 
 

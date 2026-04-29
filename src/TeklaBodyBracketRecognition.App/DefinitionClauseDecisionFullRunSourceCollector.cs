@@ -131,7 +131,7 @@ internal static class DefinitionClauseDecisionFullRunSourceCollector
         return result;
     }
 
-    private static string ResolveSourceMemberMainClassCode(string sourceFile)
+    internal static string ResolveSourceMemberMainClassCodeForObservation(string sourceFile)
     {
         if (string.IsNullOrWhiteSpace(sourceFile) || !File.Exists(sourceFile))
         {
@@ -157,9 +157,9 @@ internal static class DefinitionClauseDecisionFullRunSourceCollector
                 1 => "H",
                 2 => "BOX",
                 3 => "T",
-                4 => "L",
-                5 => "PIPE",
-                6 => "ROD",
+                4 => "CROSS",
+                5 => "L",
+                6 => "PIPE",
                 7 => "IRREGULAR",
                 _ => string.Empty
             };
@@ -168,6 +168,11 @@ internal static class DefinitionClauseDecisionFullRunSourceCollector
         {
             return string.Empty;
         }
+    }
+
+    private static string ResolveSourceMemberMainClassCode(string sourceFile)
+    {
+        return ResolveSourceMemberMainClassCodeForObservation(sourceFile);
     }
 
     public static List<DefinitionClauseDecisionFullRunRepresentativePartSource> CollectRepresentativeParts(
@@ -1191,7 +1196,7 @@ internal static class DefinitionClauseDecisionFullRunSourceCollector
         if (parts.Count == 0)
         {
             if (string.Equals(sourceSemantic.SectionType, "STANDARD_ROD", StringComparison.Ordinal) &&
-                string.Equals(summary.ImportSynthesisKind, "BOX", StringComparison.Ordinal))
+                IsBuiltUpBoxDescriptor(summary))
             {
                 return null;
             }
@@ -1207,7 +1212,7 @@ internal static class DefinitionClauseDecisionFullRunSourceCollector
         if (directTarget is not null)
         {
             if (string.Equals(sourceSemantic.SectionType, "STANDARD_ROD", StringComparison.Ordinal) &&
-                string.Equals(summary.ImportSynthesisKind, "BOX", StringComparison.Ordinal))
+                IsBuiltUpBoxDescriptor(summary))
             {
                 return null;
             }
@@ -1220,7 +1225,7 @@ internal static class DefinitionClauseDecisionFullRunSourceCollector
             var rodTarget = parts.FirstOrDefault(
                 item => item.PartId == sourceMainPartId || item.PartId == inputMainPartId);
             if (rodTarget is not null &&
-                !string.Equals(summary.ImportSynthesisKind, "BOX", StringComparison.Ordinal))
+                !IsBuiltUpBoxDescriptor(summary))
             {
                 return rodTarget.PartId;
             }
@@ -1237,22 +1242,8 @@ internal static class DefinitionClauseDecisionFullRunSourceCollector
             return null;
         }
 
-        if (proof.Result.CoreBodyPartIds.Count > 1 &&
-            proof.Result.ReviewPartIds.Count == 0 &&
-            !string.IsNullOrWhiteSpace(summary.ImportSynthesisKind))
-        {
-            return proof.Result.CoreBodyPartIds[0];
-        }
-
-        if (proof.Result.CoreBodyPartIds.Count == 0 &&
-            proof.Result.ReviewPartIds.Count == 0 &&
-            !string.IsNullOrWhiteSpace(summary.ImportSynthesisKind))
-        {
-            return sourceMainPartId;
-        }
-
         if (string.Equals(sourceSemantic.SectionType, "STANDARD_ROD", StringComparison.Ordinal) &&
-            string.Equals(summary.ImportSynthesisKind, "BOX", StringComparison.Ordinal))
+            IsBuiltUpBoxDescriptor(summary))
         {
             return null;
         }
@@ -1268,4 +1259,11 @@ internal static class DefinitionClauseDecisionFullRunSourceCollector
         DefinitionClauseDecisionBridgeEffectSnapshot Snapshot,
         DefinitionClauseDecisionBridgeAdaptedResult AdaptedResult,
         CoreBodyProofPartResult Part);
+
+    private static bool IsBuiltUpBoxDescriptor(BodyMaterialSummary summary)
+    {
+        return string.Equals(summary.BodyDescriptorFamily, "BuiltUpBox", StringComparison.Ordinal) ||
+               string.Equals(summary.BodyDescriptorSectionType, "BUILTUP_BOX", StringComparison.Ordinal) ||
+               string.Equals(summary.BodyDescriptorSectionType, "BUILTUP_BOX_VARIANT", StringComparison.Ordinal);
+    }
 }

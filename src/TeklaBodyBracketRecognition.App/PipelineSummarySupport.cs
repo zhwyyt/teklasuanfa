@@ -289,7 +289,7 @@ internal static class PipelineSummarySupport
         lines.Add("## 说明");
         lines.Add(string.Empty);
         lines.Add("- `section-topology-*.json` 是阶段 4.5 的旁路产物，先在原始迹线之上做最小 `trace cleaning + envelope`。");
-        lines.Add("- `ClosedLoopCandidate` 目前只表示“站位上出现了四边包络证据”，不是最终箱型判定。");
+        lines.Add("- `ClosedLoopCandidate` 当前已收紧为“站位上出现真实闭环/真实围合证据”，不再把单纯四边包络接触直接当成闭合候选。");
         lines.Add("- 阶段 5 的主体核心证明器，将优先消费这里的 `retained / internal / envelope` 三类证据。");
         return string.Join(Environment.NewLine, lines);
     }

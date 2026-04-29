@@ -15,6 +15,76 @@
 
 - `2026-04-25`
 
+## 2026-04-29 当前补充
+
+- 已新增旧派生字段运行时依赖排查真源文档：
+  - [OLD_DERIVED_RUNTIME_DEPENDENCY_AUDIT.zh-CN.md](</I:/autoteklasuanfa/OLD_DERIVED_RUNTIME_DEPENDENCY_AUDIT.zh-CN.md>)
+  - 当前已先完成第一轮盘点，并明确：
+    - `EndProximity / NearMemberStart / NearMemberEnd`
+      - 分区主判定已从旧缓存字段切到当前 provisional axis 同源重算
+      - 但 importer 仍保留导入，后续还需继续扫残余运行时读取点
+    - `SourceMemberMainClassCode`
+      - 阶段 6 主家族判定已去依赖
+      - coarse observation 层仍保留 direct signal 弱依赖
+    - `ImportSynthesisKind`
+      - 仍参与家族映射、coarse direct signal、full-run source target 选择
+      - 当前确认为最大的旧派生运行时残留字段之一
+    - `SemanticRole / SemanticRoleScore`
+      - 当前仍作为阶段 2 的外部先验运行时输入
+      - 暂不作为“旧结论残留”直接删除
+    - `BodyDescriptorFamily / BodyDescriptorSectionType`
+      - 不属于旧启发式残留，但属于摘要派生字段
+      - 后续仍需继续厘清“辅助一致性”与“主判据”边界
+
+- 已完成粗分类观察层旧 H 借力路径清理：
+  - 已从 [CoarseMainClassObservationCollector.cs](</I:/autoteklasuanfa/src/TeklaBodyBracketRecognition.App/CoarseMainClassObservationCollector.cs>) 删除
+    `DIRECT_H_WITH_NARROW_CANDIDATE_SET`
+  - 当前粗分类观察层不再允许“候选集只剩 1-2 块主板时，借上游 `SourceMemberMainClassCode = H` 直接抬成 H”
+- 已对活跃基线复跑确认：
+  - [run_body_bracket_real_13_no_h_fallback_v1](/I:/autoteklasuanfa/.tmpresults/run_body_bracket_real_13_no_h_fallback_v1)
+    - `FallbackCount = 0`
+    - 原先 5 条旧借力样本：
+      - `T2-12MJ-1`
+      - `T2-12MJ-4`
+      - `T2-13GL-20`
+      - `T2-13MJ-2`
+      - `T2-13MJ-4`
+    - 现全部回落为：
+      - `CoarseMainClassCode = PRIMARY_PLATE_BODY`
+      - `ReasonCode = SINGLE_PLATE_STATION_MAJORITY`
+  - [run_body_bracket_real_14_no_h_fallback_v1](/I:/autoteklasuanfa/.tmpresults/run_body_bracket_real_14_no_h_fallback_v1)
+    - `FallbackCount = 0`
+    - `T2-13GL-9 / 10 / 16 / 21 / 23 / 24` 仍稳定为：
+      - `CoarseMainClassCode = H`
+      - `ReasonCode = WEB_FLANGE_SECTION_CONSENSUS`
+- 当前结论收口为：
+  - 旧 `DIRECT_H_WITH_NARROW_CANDIDATE_SET` 确认为脏口子，已移除
+  - 粗分类观察层的 `H` 现在只允许来自真实 `web + flange` 多切片共识
+  - `run_body_bracket_real_12_box_extended_loop_v4` 对应输入缓存目录当前未在 `I:\autoteklasuanfa\.tmpdata` 下找到，尚未补跑
+- 已完成 `T2-13GL-20` 一类“主板候选集只剩双主板”的根因修复：
+  - 已确认根因不是下游 collector 误杀，而是 [BodyCandidatePartitioner.cs](</I:/autoteklasuanfa/src/TeklaBodyBracketRecognition.Core/Algorithms/BodyCandidatePartitioner.cs>)
+    在同一层分区逻辑里混用了两套纵向位置信号：
+    - `coverage / projectedInterval` 走的是当前 provisional axis 的现场重算
+    - `nearStableZone` 却仍吃导入缓存里的旧 `EndProximity`
+  - 这会导致像 `T2-13GL-20` 的长腹板 `269901014` 出现：
+    - 当前重算 `AxisInterval = 0..2048.919`
+    - `LongitudinalCoverageEstimate = 1`
+    - 但旧缓存 `EndProximity = NearStart=true / NearEnd=false`
+    - 最终被误判成 `single-ended local part`
+    - 只落到 `PartitionClass = 2`
+  - 当前已把 `nearStableZone` 改为基于当前 `projectedInterval + assemblySpan` 同源重算，不再直接依赖缓存导入的旧 `EndProximity`
+  - 已对真实 [run_body_bracket_real_13_gl20_interval_consistency_v1](/I:/autoteklasuanfa/.tmpresults/run_body_bracket_real_13_gl20_interval_consistency_v1) 复跑确认：
+    - `T2-13GL-20`
+      - `CandidatePartIds = 269901014,269901133,269901147`
+      - `CandidatePartCount = 3`
+      - `HStationCount = 5`
+      - `CoarseMainClassCode = H`
+      - `ReasonCode = WEB_FLANGE_SECTION_CONSENSUS`
+    - 同时 `T2-12MJ-1 / T2-12MJ-4 / T2-13MJ-2 / T2-13MJ-4`
+      仍保持：
+      - `CoarseMainClassCode = PRIMARY_PLATE_BODY`
+      - `ReasonCode = SINGLE_PLATE_STATION_MAJORITY`
+
 ## 当前目标
 
 将主材识别从“启发式板链投票器”重构为“工程定义驱动的主体截面证明器”。

@@ -10,7 +10,7 @@
 
 ## 当前主题
 
-- 变截面 `H / BOX` 的粗分类收敛
+- 基础几何与数据健康检查层
 
 当前严格边界：
 
@@ -22,11 +22,65 @@
   - proof 条款层
   - 家族映射层
 
+当前主题真源：
+
+- [FOUNDATION_GEOMETRY_HEALTH_AUDIT_PLAN.zh-CN.md](</I:/autoteklasuanfa/FOUNDATION_GEOMETRY_HEALTH_AUDIT_PLAN.zh-CN.md>)
+
+---
+
+## 当前唯一目标
+
+把“粗分类异常后再人工反查”的工作方式，
+改成“先由基础健康检查层暴露根因，再决定是否需要动粗分类”。
+
+---
+
+## 当前首批落地范围
+
+只做三类检查：
+
+1. `AxisConsistency`
+2. `CandidateSetConsistency`
+3. `SampleTraceConsistency`
+
+暂不进入：
+
+1. `SectionFrameConsistency`
+2. `TopologyInputConsistency`
+3. 任何 proof / 家族映射判定逻辑
+
 ---
 
 ## 当前任务拆解
 
-### A. 问题台账重建
+### A. 基础健康检查方案定版
+
+目标：
+
+- 把基础健康检查层的检查对象、invariant、输出工件与首批落地顺序固定下来
+
+完成标准：
+
+1. 明确这层只做 sidecar audit
+2. 明确首批 3 类检查项
+3. 明确 member / candidate / station / trace 四层输出对象
+4. 明确首版不回灌粗分类主判定
+
+当前状态：
+
+- 已完成首版
+
+当前产物：
+
+- [FOUNDATION_GEOMETRY_HEALTH_AUDIT_PLAN.zh-CN.md](</I:/autoteklasuanfa/FOUNDATION_GEOMETRY_HEALTH_AUDIT_PLAN.zh-CN.md>)
+
+当前下一步：
+
+1. 开始第一轮最小实现
+2. 先只落 member-level summary
+3. 再按需要补 station / candidate detail
+
+### B. 问题台账重建
 
 目标：
 
@@ -63,7 +117,39 @@
 4. `T3-2YPGL-18 / T3-5GL-51 / T3-5GL-78`
    - 可作为正向对照样本
 
-### B. 变截面 `BOX` 粗分类收敛
+### C. 第一轮基础健康检查落地
+
+目标：
+
+- 让当前已知典型 root cause 能先在健康检查层暴露，而不是等粗分类异常后人工反查
+
+完成标准：
+
+1. 能对主轴劫持给出明确 reason code
+2. 能对候选集失守给出明确 reason code
+3. 能对 sample-trace 失真给出明确 reason code
+4. 输出独立 sidecar，不改粗分类主链
+
+当前状态：
+
+- 待开始
+
+首批样本：
+
+1. `T3-2GL-53 / T3-2GL-55`
+   - 目标：验证 `SampleTraceConsistency`
+2. `T2-13GL-9 / 10 / 16 / 21 / 24`
+   - 目标：验证 `AxisConsistency`
+3. `T2-13GL-23`
+   - 目标：验证 `CandidateSetConsistency`
+
+当前下一步：
+
+1. 设计最小 sidecar 输出契约
+2. 选定 collector / workflow 的接入位置
+3. 先跑一轮 member-level summary
+
+### D. 变截面 `BOX` 粗分类收敛
 
 目标：
 
@@ -112,7 +198,7 @@
    - 用更多 `BOX / 非 BOX` 样本验证这套闭环证据的普适性
    - 特别检查它不会把 `HXZ` 一类“边条围边但不是真闭环”的样本误吃成 `BOX`
 
-### C. 变截面 `H` 粗分类收敛
+### E. 变截面 `H` 粗分类收敛
 
 目标：
 
@@ -183,8 +269,36 @@
    - 当前新的下一步：
      - 评估 `DIRECT_H_WITH_NARROW_CANDIDATE_SET` 这条旧桥现在是否只剩极少数历史残留样本
      - 若样本面允许，可计划正式清理这条旧借力路径
+5. `T3-2GL-53 / T3-2GL-55`
+   - 当前已从“斜板 H 判据是否过窄”重新定位到“trace 整理层把平行翼板拉成了镜像斜线”
+   - 已确认：
+     - 原始导出 member `Samples` 里，两件的外板仍是平行翼板、腹板仍是正交连接板
+     - 问题不在模型本身
+   - 当前状态：
+     - 已修
+   - 修复口径：
+     - [SectionTraceExtractor.cs](</I:/autoteklasuanfa/src/TeklaBodyBracketRecognition.Core/Algorithms/SectionTraceExtractor.cs>)
+       的 `TryResolveTraceFromSolidEdges(...)`
+       不再用交点云最远点对直接当 trace 方向
+     - 改为：
+       - 结合 `PlateNormal x sectionAxisX / PlateLongDirection / PlateWidthDirection`
+       - 按“沿方向跨度大、法向散布小”的带状评分恢复代表线段方向
+   - 最新验证：
+     - [run_body_bracket_real_16_trace_fix_check_v1](</I:/autoteklasuanfa/.tmpresults/run_body_bracket_real_16_trace_fix_check_v1>)
+       - `T3-2GL-53`
+         - `HStationCount = 5 / EligibleStationCount = 5`
+         - `CoarseMainClassCode = H`
+       - `T3-2GL-55`
+         - `HStationCount = 5 / EligibleStationCount = 5`
+         - `CoarseMainClassCode = H`
+   - 当前结论：
+     - 这类样本的主矛盾不是 `H` 判据太严
+     - 而是粗分类输入的 trace 方向先被整理歪了
+   - 当前下一步：
+     - 继续横扫 `GL / HXZ / YPGL` 中是否还有同类“交点云被最远点对带偏”的样本
+     - 若有，继续按 trace 表达层根因处理，不回到放宽 `H` 判据
 
-### D. 分支收拢决策
+### F. 分支收拢决策
 
 目标：
 
@@ -199,7 +313,7 @@
 
 - 待决策
 
-### E. 旧派生字段运行时依赖排查
+### G. 旧派生字段运行时依赖排查
 
 目标：
 
@@ -439,25 +553,10 @@
 
 ## 当前阻塞项
 
-1. 活跃样本还没有形成新的按层问题台账
-2. 历史长状态板/任务板信息量过大，不适合作为后续日常控制面
-3. 旧语义、旧分支、旧验证结论仍可能干扰新决策
-4. 当前粗分类链里仍混有两类旧口径：
-   - 主体候选层的 `SpecialShape` 一刀切排除
-   - 观察层对 `directHSignalCount` 的运行时借力
-5. 当前已新暴露一层更深阻塞：
-   - `SectionTraceExtractor` 仍按“一块零件只输出一条 trace”工作
-   - 对折板/复合壁板/变截面板的粗拓扑表达能力不足
-6. `2026-04-28` 最新状态更新：
-   - 第 4 条中的两项，已在粗分类观察层分别完成一轮真实样本验证
-   - 当前真正剩余的主阻塞已经进一步集中到第 5 条，也就是 `BOX` 方向的 trace-expression / closed-loop evidence
-7. `2026-04-29` 新增阻塞认知：
-   - 旧派生字段清理不能只盯“主判定有没有直接读”
-   - 还要继续扫：
-     - span source 选择
-     - direct signal 放宽门槛
-     - source target fallback
-   - 否则会出现“主判定改干净了，但前置层和旁路层还在吃旧结论”的假收口
+1. 当前还缺一层独立的基础健康检查 sidecar
+2. 现在大多数 root cause 仍要靠人工顺藤摸瓜，无法先按 invariant 自动暴露
+3. 如果不先补健康检查层，后续仍容易把输入失真误判成粗分类规则问题
+4. `SectionFrameConsistency / TopologyInputConsistency` 还未进入第一轮实现，折线段和站位质量问题暂时仍要人工复核
 
 ---
 
@@ -472,16 +571,13 @@
 
 ## 本轮推荐顺序
 
-1. 继续 E：旧派生字段运行时依赖排查
-   - 当前第一优先已转成：
-     - 主体候选层仍是否残留旧字段参与 span source / coverage / candidate set
-     - 粗分类层是否还有任何 direct signal / summary truth / descriptor truth 借力
-   - 暂停继续排查：
-     - `BodyFamilyDefinitionEvaluator`
-     - `DefinitionClauseDecisionFullRunSourceCollector`
-2. 再回到 B：变截面 `BOX`
-3. `H` 当前只保留回归验证，不再作为主攻主题
-4. 最后做 D：分支收拢确认
+1. 先做 A：基础健康检查方案定版
+   - 已完成
+2. 再做 C：第一轮基础健康检查落地
+   - 先只落 member-level summary
+   - 先实现 `AxisConsistency / CandidateSetConsistency / SampleTraceConsistency`
+3. `BOX / H` 当前只作为对照样本来源，不再先扩粗分类规则
+4. 旧派生字段与分支收拢继续记账，但不抢当前主题
 
 ---
 

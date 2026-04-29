@@ -799,16 +799,13 @@ public sealed class CoreBodyProofEngine
         var tolerance = Math.Max(_options.ContactDistanceToleranceMm * 2.0, 8.0);
         var bodyCandidateEnvelopeTraceCount = retainedBodyCandidates.Count(
             item => TouchesEnvelope(item, minY, maxY, minZ, maxZ, tolerance));
-        var touchesMinY = retained.Any(item => Math.Min(item.StartY, item.EndY) <= minY + tolerance);
-        var touchesMaxY = retained.Any(item => Math.Max(item.StartY, item.EndY) >= maxY - tolerance);
-        var touchesMinZ = retained.Any(item => Math.Min(item.StartZ, item.EndZ) <= minZ + tolerance);
-        var touchesMaxZ = retained.Any(item => Math.Max(item.StartZ, item.EndZ) >= maxZ - tolerance);
-        var recomputedClosedLoopCandidate = retained.Length >= 4 &&
-                                            retainedBodyCandidates.Length >= 2 &&
-                                            touchesMinY &&
-                                            touchesMaxY &&
-                                            touchesMinZ &&
-                                            touchesMaxZ;
+        var recomputedClosedLoopCandidate = SectionClosedLoopEvidence.HasTrueClosedLoop(
+            retained,
+            minY,
+            maxY,
+            minZ,
+            maxZ,
+            tolerance);
         var dominantBodyPartIds = ResolveDominantPartIds(retainedBodyCandidates);
         var dominantEnvelopeBodyPartIds = ResolveDominantPartIds(
             retainedBodyCandidates.Where(item => TouchesEnvelope(item, minY, maxY, minZ, maxZ, tolerance)).ToArray());
@@ -846,10 +843,7 @@ public sealed class CoreBodyProofEngine
         var currentMaxY = Math.Max(current.StartY, current.EndY);
         var currentMinZ = Math.Min(current.StartZ, current.EndZ);
         var currentMaxZ = Math.Max(current.StartZ, current.EndZ);
-        return currentMinY <= minY + tolerance ||
-               currentMaxY >= maxY - tolerance ||
-               currentMinZ <= minZ + tolerance ||
-               currentMaxZ >= maxZ - tolerance;
+        return SectionClosedLoopEvidence.TouchesEnvelope(current, minY, maxY, minZ, maxZ, tolerance);
     }
 
     private static string NormalizeProfileFamily(string profileString)
@@ -872,14 +866,7 @@ public sealed class CoreBodyProofEngine
         double maxZ,
         double tolerance)
     {
-        var segmentMinY = Math.Min(segment.StartY, segment.EndY);
-        var segmentMaxY = Math.Max(segment.StartY, segment.EndY);
-        var segmentMinZ = Math.Min(segment.StartZ, segment.EndZ);
-        var segmentMaxZ = Math.Max(segment.StartZ, segment.EndZ);
-        return segmentMinY <= minY + tolerance ||
-               segmentMaxY >= maxY - tolerance ||
-               segmentMinZ <= minZ + tolerance ||
-               segmentMaxZ >= maxZ - tolerance;
+        return SectionClosedLoopEvidence.TouchesEnvelope(segment, minY, maxY, minZ, maxZ, tolerance);
     }
 
     private static IReadOnlyList<int> ResolveDominantPartIds(IReadOnlyList<SectionTraceCleanSegment> segments)

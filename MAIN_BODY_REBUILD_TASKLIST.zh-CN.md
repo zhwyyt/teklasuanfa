@@ -1842,3 +1842,58 @@
     - `NO_ELIGIBLE_CANDIDATE_SET`
     - `TOPOLOGY_CONSENSUS_NOT_REACHED`
   - 只有在确认还能明显提升普适性时，再收第三轮候选集/切片聚合规则
+# 2026-04-29 当前任务补充
+
+- 已完成：
+  - 新增旧派生字段运行时依赖排查表：
+    [OLD_DERIVED_RUNTIME_DEPENDENCY_AUDIT.zh-CN.md](</I:/autoteklasuanfa/OLD_DERIVED_RUNTIME_DEPENDENCY_AUDIT.zh-CN.md>)
+  - 已完成第一轮字段分级：
+    - 高优先级继续收口：
+      - `ImportSynthesisKind`
+      - `EndProximity / NearMemberStart / NearMemberEnd` 的残余运行时读取
+    - 中优先级评估是否彻底 observation 化：
+      - `SourceMemberMainClassCode`
+      - `BodyDescriptorFamily / BodyDescriptorSectionType` 在 coarse direct signal / bypass 中的角色
+    - 暂不去依赖，但明确属于外部先验：
+      - `SemanticRole / SemanticRoleScore`
+- 当前下一步：
+  - 先专攻 `ImportSynthesisKind`
+  - 逐点梳理：
+    - 哪些是必要桥接
+    - 哪些应改成 `LeadClause / BodyDescriptor` 驱动
+    - 哪些应纯降级成审计字段
+
+- 已完成：
+  - 删除粗分类观察层旧 H 借力分支 `DIRECT_H_WITH_NARROW_CANDIDATE_SET`
+  - 复跑 [run_body_bracket_real_13_no_h_fallback_v1](/I:/autoteklasuanfa/.tmpresults/run_body_bracket_real_13_no_h_fallback_v1)
+    - `FallbackCount = 0`
+    - `T2-12MJ-1 / T2-12MJ-4 / T2-13GL-20 / T2-13MJ-2 / T2-13MJ-4`
+      全部回落为 `PRIMARY_PLATE_BODY`
+  - 复跑 [run_body_bracket_real_14_no_h_fallback_v1](/I:/autoteklasuanfa/.tmpresults/run_body_bracket_real_14_no_h_fallback_v1)
+    - `FallbackCount = 0`
+    - `T2-13GL-9 / 10 / 16 / 21 / 23 / 24`
+      仍稳定为 `H + WEB_FLANGE_SECTION_CONSENSUS`
+- 当前明确冻结：
+  - 粗分类观察层禁止再借 `SourceMemberMainClassCode = H` 直接抬主类
+  - `H` 只能来自真实 `web + flange` 多切片拓扑共识
+- 当前下一步：
+  - 继续围绕粗分类主线，专攻“为什么 `T2-13GL-20` 这类样本当前只剩双主板候选”
+  - 但修复口径必须是上游/候选集层面的普适性修复，不能恢复任何旧借力
+
+- 已完成：
+  - `T2-13GL-20` 一类“长腹板被收缩成附件候选”的根因已拆清并修复
+  - 已确认根因是：
+    - `BodyCandidatePartitioner` 用当前 provisional axis 重算 `coverage / projectedInterval`
+    - 却继续直接使用缓存导入的旧 `EndProximity`
+    - 导致同一层分区逻辑内部出现纵向位置信号打架
+  - 已把 `nearStableZone` 改为基于当前 `projectedInterval + assemblySpan` 同源重算
+  - 已复跑 [run_body_bracket_real_13_gl20_interval_consistency_v1](/I:/autoteklasuanfa/.tmpresults/run_body_bracket_real_13_gl20_interval_consistency_v1)
+    - `T2-13GL-20` 已回到：
+      - `CandidatePartCount = 3`
+      - `CoarseMainClassCode = H`
+      - `ReasonCode = WEB_FLANGE_SECTION_CONSENSUS`
+    - `T2-12MJ-1 / T2-12MJ-4 / T2-13MJ-2 / T2-13MJ-4`
+      仍保持 `PRIMARY_PLATE_BODY`
+- 当前下一步：
+  - 继续横向排查 `GL / YPGL / HXZ` 中是否还有同类“旧 EndProximity 与当前重算 interval 打架”的样本
+  - 若有，再统一收敛到“候选集/稳定区只认当前 provisional axis 重算口径”

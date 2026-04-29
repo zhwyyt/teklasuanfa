@@ -71,8 +71,7 @@ internal static class BodyFamilyDefinitionEvaluator
                      "LeadClause = CONTROLLER_REASSIGNMENT_REVIEW_CLAUSE",
                      "LeadClauseVerdict = Broken",
                      "LeadClausePromotionReadiness = ReadyForPromotion",
-                     $"SourceMemberMainClass = {NormalizeCode(assembly.SourceMemberMainClassCode)}",
-                     $"ImportSynthesisKind = {NormalizeCode(assembly.ImportSynthesisKind)}"
+                     $"BodyDescriptorFamily = {NormalizeCode(assembly.BodyDescriptorFamily)}"
                  ]);
         }
 
@@ -85,7 +84,7 @@ internal static class BodyFamilyDefinitionEvaluator
                 subtypeCode: "CLOSED_LOOP_BOX",
                 subtypeLabelZh: "闭合箱形截面",
                 reasonCode: "BODY_PLATE_OVERRIDDEN_BY_BOX_SEMANTIC",
-                reasonLabelZh: "上游稳定语义已明确为 BOX 主类，主体板持续条款不再阻断 BOX 家族归属",
+                reasonLabelZh: "下游工程定义链已明确为 BOX 组织关系，主体板持续条款不再阻断 BOX 家族归属",
                 satisfiedConditions:
                 [
                     "LeadClause = BODY_PLATE_CONTINUITY_CLAUSE",
@@ -93,30 +92,7 @@ internal static class BodyFamilyDefinitionEvaluator
                     "LeadClausePromotionReadiness = ReadyForPromotion",
                     $"LeadClauseEffectDirection = {NormalizeCode(assembly.LeadClauseEffectDirectionCode)}",
                     $"Break/Rewrite = B{assembly.LeadClauseBreakEffectCount}/R{assembly.LeadClauseRewriteEffectCount}",
-                    $"SourceMemberMainClass = {NormalizeCode(assembly.SourceMemberMainClassCode)}",
-                    $"ImportSynthesisKind = {NormalizeCode(assembly.ImportSynthesisKind)}"
-                ]);
-        }
-
-        if (ShouldPromoteSemanticBoxWithoutClause(assembly))
-        {
-            return BuildAdjudicatedRow(
-                assembly,
-                familyCode: "BOX",
-                familyLabelZh: "闭合箱形主体",
-                subtypeCode: "CLOSED_LOOP_BOX",
-                subtypeLabelZh: "闭合箱形截面",
-                reasonCode: "BOX_DESCRIPTOR_SEMANTIC_CONSENSUS_READY",
-                reasonLabelZh: "built-up box 描述与上游 BOX 语义一致，即使 proof 暂未产出主条款，也可进入 BOX 家族",
-                satisfiedConditions:
-                [
-                    "LeadClause = NONE (NO_CLAUSE_ROWS)",
-                    $"BodyDescriptorFamily = {NormalizeCode(assembly.BodyDescriptorFamily)}",
-                    $"BodyDescriptorSectionType = {NormalizeCode(assembly.BodyDescriptorSectionType)}",
-                    $"SourceMemberMainClass = {NormalizeCode(assembly.SourceMemberMainClassCode)}",
-                    $"ImportSynthesisKind = {NormalizeCode(assembly.ImportSynthesisKind)}",
-                    $"SourceSemanticPriorityApplied = {assembly.SourceSemanticPriorityApplied}",
-                    $"HasTopologyRewrite = {assembly.HasTopologyRewrite}"
+                    $"BodyDescriptorFamily = {NormalizeCode(assembly.BodyDescriptorFamily)}"
                 ]);
         }
 
@@ -129,14 +105,13 @@ internal static class BodyFamilyDefinitionEvaluator
                 subtypeCode: "GENERAL_BUILTUP_H",
                 subtypeLabelZh: "一般 built-up H",
                 reasonCode: "PRIMARY_PLATE_OVERRIDDEN_BY_H_SEMANTIC",
-                reasonLabelZh: "上游稳定语义已明确为 H 主类，单主板条款不再覆盖 H 家族归属",
+                reasonLabelZh: "下游工程定义链已明确为 H 组织关系，单主板条款不再覆盖 H 家族归属",
                  satisfiedConditions:
                  [
                      "LeadClause = PRIMARY_PLATE_CONTINUITY_CLAUSE",
                      $"LeadClauseVerdict = {NormalizeCode(assembly.LeadClauseVerdictCode)}",
                      "LeadClausePromotionReadiness = ReadyForPromotion",
-                     $"SourceMemberMainClass = {NormalizeCode(assembly.SourceMemberMainClassCode)}",
-                     $"ImportSynthesisKind = {NormalizeCode(assembly.ImportSynthesisKind)}"
+                     $"BodyDescriptorFamily = {NormalizeCode(assembly.BodyDescriptorFamily)}"
                  ]);
         }
 
@@ -149,15 +124,14 @@ internal static class BodyFamilyDefinitionEvaluator
                 subtypeCode: "GENERAL_BUILTUP_H",
                 subtypeLabelZh: "一般 built-up H",
                 reasonCode: "H_REVIEW_READY_OVERRIDDEN_BY_STABLE_H_SEMANTIC",
-                reasonLabelZh: "H 连续性条款已稳定指向 H 主类，BuiltUpT 启发式不再继续压入人工暂缓",
+                reasonLabelZh: "H 连续性条款已稳定指向 H 组织关系，BuiltUpT 启发式不再继续压入人工暂缓",
                  satisfiedConditions:
                  [
                      "LeadClause = H_WEB_FLANGE_CONTINUITY_CLAUSE",
                      "LeadClauseVerdict = Broken",
                      "LeadClausePromotionReadiness = ReadyForReview",
                      $"LeadClauseEffectDirection = {NormalizeCode(assembly.LeadClauseEffectDirectionCode)}",
-                     $"Break/Rewrite = B{assembly.LeadClauseBreakEffectCount}/R{assembly.LeadClauseRewriteEffectCount}",
-                     $"SourceMemberMainClass = {NormalizeCode(assembly.SourceMemberMainClassCode)}"
+                     $"Break/Rewrite = B{assembly.LeadClauseBreakEffectCount}/R{assembly.LeadClauseRewriteEffectCount}"
                  ]);
         }
 
@@ -241,10 +215,7 @@ internal static class BodyFamilyDefinitionEvaluator
         bool decisiveVerdict)
     {
         return IsPrimaryPlateReady(assembly, readinessReady, decisiveVerdict) &&
-               (
-                   string.Equals(assembly.SourceMemberMainClassCode, "H", StringComparison.Ordinal) ||
-                   string.Equals(assembly.ImportSynthesisKind, "H", StringComparison.Ordinal)
-                );
+               string.Equals(assembly.BodyDescriptorFamily, "BuiltUpH", StringComparison.Ordinal);
     }
 
     private static bool ShouldPromoteSemanticBoxFromBodyPlate(
@@ -256,23 +227,7 @@ internal static class BodyFamilyDefinitionEvaluator
                string.Equals(assembly.LeadClauseEffectDirectionCode, "SatisfiedCandidate", StringComparison.Ordinal) &&
                assembly.LeadClauseBreakEffectCount == 0 &&
                assembly.LeadClauseRewriteEffectCount >= 2 &&
-               (
-                   string.Equals(assembly.SourceMemberMainClassCode, "BOX", StringComparison.Ordinal) ||
-                   string.Equals(assembly.ImportSynthesisKind, "BOX", StringComparison.Ordinal)
-               );
-    }
-
-    private static bool ShouldPromoteSemanticBoxWithoutClause(
-        DefinitionClauseDecisionFullRunAssemblySource assembly)
-    {
-        return string.Equals(assembly.ClauseMix, "NO_CLAUSE_ROWS", StringComparison.Ordinal) &&
-               string.IsNullOrWhiteSpace(assembly.LeadClauseCode) &&
-               string.Equals(assembly.BodyDescriptorFamily, "BuiltUpBox", StringComparison.Ordinal) &&
-               string.Equals(assembly.BodyDescriptorSectionType, "BUILTUP_BOX_VARIANT", StringComparison.Ordinal) &&
-               string.Equals(assembly.SourceMemberMainClassCode, "BOX", StringComparison.Ordinal) &&
-               string.Equals(assembly.ImportSynthesisKind, "BOX", StringComparison.Ordinal) &&
-               !assembly.SourceSemanticPriorityApplied &&
-               !assembly.HasTopologyRewrite;
+               string.Equals(assembly.BodyDescriptorFamily, "BuiltUpBox", StringComparison.Ordinal);
     }
 
     private static bool ShouldPromoteReviewReadyGenericH(
@@ -284,7 +239,7 @@ internal static class BodyFamilyDefinitionEvaluator
                string.Equals(assembly.LeadClauseEffectDirectionCode, "BrokenCandidate", StringComparison.Ordinal) &&
                assembly.LeadClauseBreakEffectCount == 2 &&
                assembly.LeadClauseRewriteEffectCount == 1 &&
-               string.Equals(assembly.SourceMemberMainClassCode, "H", StringComparison.Ordinal);
+               string.Equals(assembly.BodyDescriptorFamily, "BuiltUpH", StringComparison.Ordinal);
     }
 
     private static bool IsVariableSectionBoxReviewReady(
@@ -297,10 +252,7 @@ internal static class BodyFamilyDefinitionEvaluator
                     "CONTROLLER_REASSIGNMENT_REVIEW_CLAUSE",
                     StringComparison.Ordinal) &&
                string.Equals(assembly.LeadClauseVerdictCode, "Broken", StringComparison.Ordinal) &&
-               (
-                   string.Equals(assembly.SourceMemberMainClassCode, "BOX", StringComparison.Ordinal) ||
-                   string.Equals(assembly.ImportSynthesisKind, "BOX", StringComparison.Ordinal)
-               );
+               string.Equals(assembly.BodyDescriptorFamily, "BuiltUpBox", StringComparison.Ordinal);
     }
 
     private static bool IsFoldedHReady(
@@ -477,8 +429,8 @@ internal static class BodyFamilyDefinitionEvaluator
 
     private static bool LooksLikeStableHFamily(DefinitionClauseDecisionFullRunAssemblySource assembly)
     {
-        return string.Equals(assembly.SourceMemberMainClassCode, "H", StringComparison.Ordinal) ||
-               string.Equals(assembly.ImportSynthesisKind, "H", StringComparison.Ordinal);
+        return string.Equals(assembly.BodyDescriptorFamily, "BuiltUpH", StringComparison.Ordinal) ||
+               string.Equals(assembly.LeadClauseCode, "H_WEB_FLANGE_CONTINUITY_CLAUSE", StringComparison.Ordinal);
     }
 
     private static string NormalizeCode(string? value)

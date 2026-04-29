@@ -18,7 +18,7 @@
 
 ## 当前日期
 
-- `2026-04-28`
+- `2026-04-29`
 
 ## 当前唯一目标
 
@@ -111,14 +111,14 @@
 
 ## 当前唯一主题
 
-### 主题：变截面 `H / BOX` 的 proof 收敛与家族映射边界
-### 主题：变截面 `H / BOX` 的粗分类收敛
+### 主题：基础几何与数据健康检查层
+### 主题：变截面 `H / BOX` 粗分类基线之上的基础层体检
 
 选择这个主题的原因：
 
-1. 能直接检验上游轴线修正是否真实传导到粗分类层
-2. 能同时覆盖折线/变截面/多切片组织关系
-3. 当前只要求粗分类正确，不再让 proof / 最终判定干扰诊断
+1. 当前粗分类基线已经基本可用，但根因仍主要暴露在基础数据处理层
+2. 最近典型问题已证明：很多“粗分类异常”真正根因是主轴、候选集、trace 表达失真
+3. 需要先建立一层系统化健康检查，避免继续按样本逐个补洞
 
 ---
 
@@ -534,45 +534,75 @@
    - 结果：
      - `0` warning
      - `0` error
+27. `2026-04-29` 已确认 `T3-2GL-53 / T3-2GL-55` 的 `H` 漏判根因在 `SectionTraceExtractor` 的截面线段整理，而不是模型真实不平行：
+   - 已核对原始导出
+     [member_T3-2GL-53.json](</I:/xingcaisuanfa/cache/run_body_bracket_real_16/members/member_T3-2GL-53.json>)
+     与
+     [member_T3-2GL-55.json](</I:/xingcaisuanfa/cache/run_body_bracket_real_16/members/member_T3-2GL-55.json>)
+     中的 `Samples`
+     - 上游样本截面里两块外板仍是标准平行翼板
+     - 中间腹板仍是正交连接板
+   - 已确认旧
+     [SectionTraceExtractor.cs](</I:/autoteklasuanfa/src/TeklaBodyBracketRecognition.Core/Algorithms/SectionTraceExtractor.cs>)
+     在 `TryResolveTraceFromSolidEdges(...)` 里，是用交点云的“最远点对”直接还原代表线段
+     - 对矩形/斜边/端部倒角板件，这会把真实平行翼板误拉成对角线或镜像斜线
+   - 当前已改为：
+     - 交点云先结合板件自身可解释的截面方向候选
+       - `PlateNormal x sectionAxisX`
+       - `PlateLongDirection`
+       - `PlateWidthDirection`
+     - 再按“沿方向跨度大、法向散布小”的带状评分选择代表方向
+     - 不再让单纯最远点对主导 trace 方向
+   - 已对真实
+     [run_body_bracket_real_16_trace_fix_check_v1](</I:/autoteklasuanfa/.tmpresults/run_body_bracket_real_16_trace_fix_check_v1>)
+     复跑确认：
+     - `T3-2GL-53`
+       - 两块外板 trace 已从镜像斜线回到平行表达
+       - `HStationCount = 5 / EligibleStationCount = 5`
+       - `CoarseMainClassCode = H`
+     - `T3-2GL-55`
+       - 两块外板 trace 已从镜像斜线回到平行表达
+       - `HStationCount = 5 / EligibleStationCount = 5`
+       - `CoarseMainClassCode = H`
+   - 当前说明：
+     - 这两个样本此前的主矛盾不是 `H` 规则门槛过严
+     - 而是粗分类输入的 `section trace` 被整理歪了
+     - trace 层回正后，现有 `H` 粗拓扑规则即可自然通过
+28. `2026-04-29` 当前活跃主题已正式切换：
+   - 不再继续以“新样本异常 -> 直接改粗分类规则”为主节奏
+   - 改为先建立基础健康检查层
+   - 新方案真源：
+     - [FOUNDATION_GEOMETRY_HEALTH_AUDIT_PLAN.zh-CN.md](</I:/autoteklasuanfa/FOUNDATION_GEOMETRY_HEALTH_AUDIT_PLAN.zh-CN.md>)
+   - 当前明确：
+     - 这层只覆盖输入层 / 主体候选层 / 截面拓扑观察层
+     - 只做 sidecar audit，不回灌粗分类主判定
+   - 第一批检查项固定为：
+     - `AxisConsistency`
+     - `CandidateSetConsistency`
+     - `SampleTraceConsistency`
+   - 目的不是替当前粗分类再加一套隐式判定器，
+     而是让后续异常样本先在基础层暴露根因码
 
 ---
 
 ## 当前下一步
 
-1. 以 [run_body_bracket_real_12_box_extended_loop_v4](</I:/autoteklasuanfa/.tmpresults/run_body_bracket_real_12_box_extended_loop_v4>) 作为新的 `BOX` 粗分类基线。
-2. 下一轮优先做：
-   - 用更多 `BOX / 非 BOX` 样本验证这套 beveled wall-midline 闭环证据的普适性
-   - 特别复核它不会把 `HXZ` 一类“边条围边但不是真闭环”的样本误判成 `BOX`
-3. 旧派生字段运行时依赖这一轮已先完成两刀：
-   - `EndProximity` 不再参与 `assemblySpan` 选源层的旧字段读取
-   - coarse observation 不再借 `ImportSynthesisKind / SourceMemberMainClassCode` 放宽 `BOX / H` 门槛
-4. 下一轮旧派生字段清理重点转到：
-   - 只允许继续做：
-     - 主体候选层旧字段残余排查
-     - 粗分类层旧字段残余排查
-   - 当前最新重点已收窄为：
-     - 复核主体候选层是否还有隐藏的旧字段/旧先验过强借力
-     - 特别继续盯：
-       - `EstimateBodyAxis(...)`
-       - `EstimateBodyAxisSegments(...)`
-       - `EstimateAssemblySpan(...)`
-       中 `inputMainPart / SemanticRole` 是否仍过强
-     - 当前已完成前两块的第一轮收口：
-       - `EstimateBodyAxisSegments(...)`
-       - `EstimateBodyAxis(...)`
-       - `EstimateAssemblySpan(...)`
-     - 主体候选层当前第一轮几何优先化已基本完成
-     - 下一轮优先转为：
-       - 用真实样本回归验证这轮候选层收口是否稳定
-      - coarse 层如无新增回灌口子，则转为回归验证，不再继续内部拆分
-   - 家族映射层 / source collector 层清理暂时停止，只保留记账
-5. `H` 方向当前先暂停继续扩规则，只保留已验证的两条收口：
-   - 方向无关的 `H` 组织关系
-   - body-like `SpecialShape` 候选纳入
-6. 主体候选层已完成两条共性前提修正：
-   - guide 候选统一回到 `PolyBeam + Beam`
-   - `SpecialShape` 长向主板不再被一刀切排除出 `BodyCandidate`
-7. 当前 `H` 正向对照样本已基本由纯粗拓扑站稳；下一步应先观察更大样本面，再决定是否还要继续动更下游层。
+1. 把 [FOUNDATION_GEOMETRY_HEALTH_AUDIT_PLAN.zh-CN.md](</I:/autoteklasuanfa/FOUNDATION_GEOMETRY_HEALTH_AUDIT_PLAN.zh-CN.md>) 作为当前主题真源。
+2. 第一轮实现只落基础健康检查 sidecar，不改粗分类主判定。
+3. 第一批检查项固定为：
+   - `AxisConsistency`
+   - `CandidateSetConsistency`
+   - `SampleTraceConsistency`
+4. 第一轮对照样本固定为：
+   - `T3-2GL-53 / 55`
+   - `T2-13GL-9 / 10 / 16 / 21 / 24`
+   - `T2-13GL-23`
+5. 首轮验收要求：
+   - 先能明确报出根因所在层级
+   - 再决定是否继续扩 `SectionFrameConsistency / TopologyInputConsistency`
+6. 当前阶段继续冻结：
+   - 不回到 proof / 家族映射层
+   - 不把 audit 结果回灌成新的粗分类借力
 
 ---
 

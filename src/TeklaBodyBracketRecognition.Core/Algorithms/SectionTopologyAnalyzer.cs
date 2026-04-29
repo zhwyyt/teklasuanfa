@@ -92,16 +92,13 @@ public sealed class SectionTopologyAnalyzer
             flags.Add("HAS_INTERNAL_TRACES");
         }
 
-        var touchesMinY = retained.Any(item => Math.Min(item.StartY, item.EndY) <= minY + envelopeTolerance);
-        var touchesMaxY = retained.Any(item => Math.Max(item.StartY, item.EndY) >= maxY - envelopeTolerance);
-        var touchesMinZ = retained.Any(item => Math.Min(item.StartZ, item.EndZ) <= minZ + envelopeTolerance);
-        var touchesMaxZ = retained.Any(item => Math.Max(item.StartZ, item.EndZ) >= maxZ - envelopeTolerance);
-        var closedLoopCandidate = retained.Length >= 4 &&
-                                  retainedBodyCandidateTraceCount >= 2 &&
-                                  touchesMinY &&
-                                  touchesMaxY &&
-                                  touchesMinZ &&
-                                  touchesMaxZ;
+        var closedLoopCandidate = SectionClosedLoopEvidence.HasTrueClosedLoop(
+            retained,
+            minY,
+            maxY,
+            minZ,
+            maxZ,
+            envelopeTolerance);
         if (closedLoopCandidate)
         {
             flags.Add("CLOSED_LOOP_CANDIDATE");
@@ -137,13 +134,6 @@ public sealed class SectionTopologyAnalyzer
         double maxZ,
         double tolerance)
     {
-        var segmentMinY = Math.Min(segment.StartY, segment.EndY);
-        var segmentMaxY = Math.Max(segment.StartY, segment.EndY);
-        var segmentMinZ = Math.Min(segment.StartZ, segment.EndZ);
-        var segmentMaxZ = Math.Max(segment.StartZ, segment.EndZ);
-        return segmentMinY <= minY + tolerance ||
-               segmentMaxY >= maxY - tolerance ||
-               segmentMinZ <= minZ + tolerance ||
-               segmentMaxZ >= maxZ - tolerance;
+        return SectionClosedLoopEvidence.TouchesEnvelope(segment, minY, maxY, minZ, maxZ, tolerance);
     }
 }
