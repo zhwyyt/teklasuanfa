@@ -311,7 +311,17 @@
 
 当前状态：
 
-- 待决策
+- 已完成
+
+当前结论：
+
+1. 已采用“切新工作分支推进”。
+2. 定版基线 PR `#1` 已合并进 `main`。
+3. 本地 `main` 已同步到 merge commit `aa144a1`。
+4. 当前新分支为：
+   - `codex/foundation-health-audit-sidecar-contract-20260429`
+5. 远端已合并旧分支 `codex/work-variable-section-proof-20260428` 已删除。
+6. sidecar 实现草稿仍保留在本地 stash，不作为当前契约分支的已落地实现。
 
 ### G. 旧派生字段运行时依赖排查
 

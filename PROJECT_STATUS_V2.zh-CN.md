@@ -44,13 +44,15 @@
 
 ## 当前工作分支
 
-- `codex/work-variable-section-proof-20260428`
+- `codex/foundation-health-audit-sidecar-contract-20260429`
 
 说明：
 
 - 当前将其视为“唯一活跃正式工作分支”
-- 主题聚焦为：变截面 `H / BOX` 的 proof 收敛与家族映射边界
+- 主题聚焦为：基础几何健康检查 sidecar 输出契约与第一轮 member-level summary
 - 其它历史实验分支仅保留为参考，不再并行开发
+- 已合并分支 `codex/work-variable-section-proof-20260428` 已进入 `main`，远端分支已删除
+- sidecar 实现草稿仍保留在本地 stash 中，后续只作为参考恢复
 
 ---
 
@@ -582,6 +584,18 @@
      - `SampleTraceConsistency`
    - 目的不是替当前粗分类再加一套隐式判定器，
      而是让后续异常样本先在基础层暴露根因码
+29. `2026-04-29` 已完成定版基线 PR 后的分支收拢：
+   - GitHub PR `#1` 已合并进 `main`
+   - 本地 `main` 已同步到 merge commit `aa144a1`
+   - 已从最新 `main` 新建当前工作分支：
+     - `codex/foundation-health-audit-sidecar-contract-20260429`
+   - 远端已合并旧分支：
+     - `codex/work-variable-section-proof-20260428`
+     已删除
+   - 本地 sidecar 实现草稿暂存保留：
+     - `stash@{1}`：`hold foundation health audit sidecar implementation draft before baseline PR`
+   - 生成物暂存保留：
+     - `stash@{0}`：`hold generated pycache before sidecar branch sync`
 
 ---
 
