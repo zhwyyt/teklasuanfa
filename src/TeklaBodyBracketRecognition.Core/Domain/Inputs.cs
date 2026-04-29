@@ -4,7 +4,11 @@ public sealed record AssemblyInput(
     string AssemblyId,
     int MainPartId,
     IReadOnlyList<PartInput> Parts,
-    IReadOnlyList<RelationshipInput> Relationships);
+    IReadOnlyList<RelationshipInput> Relationships,
+    IReadOnlyList<LongitudinalAxisSegment>? ImportedLongitudinalAxisSegments = null,
+    string? ImportedLongitudinalAxisKind = null,
+    double? ImportedLongitudinalAxisConfidence = null,
+    string? ImportedLongitudinalAxisSource = null);
 
 public sealed record PartInput(
     int PartId,
@@ -29,7 +33,14 @@ public sealed record PartInput(
     int BooleanCutCount,
     int BooleanAddCount,
     double ShopWeldDegree,
-    double SiteWeldDegree);
+    double SiteWeldDegree,
+    PartSemanticRole SemanticRole,
+    double SemanticRoleScore,
+    bool NearMemberStart,
+    bool NearMemberEnd,
+    bool OuterSideCandidate,
+    double Planarity,
+    IReadOnlyList<LineSegment3>? SolidEdges = null);
 
 public sealed record RelationshipInput(
     int PartIdA,

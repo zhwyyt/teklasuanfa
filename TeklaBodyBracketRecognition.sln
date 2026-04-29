@@ -9,6 +9,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TeklaBodyBracketRecognition
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TeklaBodyBracketRecognition.App", "src\TeklaBodyBracketRecognition.App\TeklaBodyBracketRecognition.App.csproj", "{C1E2F10E-9AB7-4640-852E-5E91AFE0BFC3}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TeklaBodyBracketRecognition.TeklaExporter", "src\TeklaBodyBracketRecognition.TeklaExporter\TeklaBodyBracketRecognition.TeklaExporter.csproj", "{2FA4C14B-8CE7-4A37-9D2D-A63FB1EA9E39}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -43,6 +45,18 @@ Global
 		{C1E2F10E-9AB7-4640-852E-5E91AFE0BFC3}.Release|x64.Build.0 = Release|Any CPU
 		{C1E2F10E-9AB7-4640-852E-5E91AFE0BFC3}.Release|x86.ActiveCfg = Release|Any CPU
 		{C1E2F10E-9AB7-4640-852E-5E91AFE0BFC3}.Release|x86.Build.0 = Release|Any CPU
+		{2FA4C14B-8CE7-4A37-9D2D-A63FB1EA9E39}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{2FA4C14B-8CE7-4A37-9D2D-A63FB1EA9E39}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{2FA4C14B-8CE7-4A37-9D2D-A63FB1EA9E39}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{2FA4C14B-8CE7-4A37-9D2D-A63FB1EA9E39}.Debug|x64.Build.0 = Debug|Any CPU
+		{2FA4C14B-8CE7-4A37-9D2D-A63FB1EA9E39}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{2FA4C14B-8CE7-4A37-9D2D-A63FB1EA9E39}.Debug|x86.Build.0 = Debug|Any CPU
+		{2FA4C14B-8CE7-4A37-9D2D-A63FB1EA9E39}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{2FA4C14B-8CE7-4A37-9D2D-A63FB1EA9E39}.Release|Any CPU.Build.0 = Release|Any CPU
+		{2FA4C14B-8CE7-4A37-9D2D-A63FB1EA9E39}.Release|x64.ActiveCfg = Release|Any CPU
+		{2FA4C14B-8CE7-4A37-9D2D-A63FB1EA9E39}.Release|x64.Build.0 = Release|Any CPU
+		{2FA4C14B-8CE7-4A37-9D2D-A63FB1EA9E39}.Release|x86.ActiveCfg = Release|Any CPU
+		{2FA4C14B-8CE7-4A37-9D2D-A63FB1EA9E39}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -50,5 +64,6 @@ Global
 	GlobalSection(NestedProjects) = preSolution
 		{277DB84D-B0FA-4B49-A838-993D1C0CDE2A} = {827E0CD3-B72D-47B6-A68D-7590B98EB39B}
 		{C1E2F10E-9AB7-4640-852E-5E91AFE0BFC3} = {827E0CD3-B72D-47B6-A68D-7590B98EB39B}
+		{2FA4C14B-8CE7-4A37-9D2D-A63FB1EA9E39} = {827E0CD3-B72D-47B6-A68D-7590B98EB39B}
 	EndGlobalSection
 EndGlobal

@@ -9,3 +9,5 @@ obj/
 *.suo
 *.log
 *.binlog
+.tmpdata/mem0/
+.mem0.local.json

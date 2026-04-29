@@ -26,6 +26,13 @@ public sealed record PartFeature
     public required int BooleanAddCount { get; init; }
     public required double ShopWeldDegree { get; init; }
     public required double SiteWeldDegree { get; init; }
+    public required PartSemanticRole SemanticRole { get; init; }
+    public required double SemanticRoleScore { get; init; }
+    public required bool NearMemberStart { get; init; }
+    public required bool NearMemberEnd { get; init; }
+    public required bool OuterSideCandidate { get; init; }
+    public required double Planarity { get; init; }
+    public required IReadOnlyList<LineSegment3> SolidEdges { get; init; }
     public required bool IsTinyPart { get; init; }
     public required bool LikelyConnectionPart { get; init; }
     public required double AspectRatio { get; init; }

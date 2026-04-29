@@ -1,0 +1,75 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net48</TargetFramework>
+    <UseWindowsForms>true</UseWindowsForms>
+    <Nullable>enable</Nullable>
+    <LangVersion>latest</LangVersion>
+    <RootNamespace>TeklaBodyBracketRecognition.TeklaExporter</RootNamespace>
+    <AssemblyName>TeklaBodyBracketRecognition.TeklaExporter.Gui</AssemblyName>
+    <Platforms>x64</Platforms>
+    <PlatformTarget>x64</PlatformTarget>
+    <Prefer32Bit>false</Prefer32Bit>
+    <TeklaStructuresPath Condition="'$(TeklaStructuresPath)' == ''">D:\Program Files\Tekla Structures\2017</TeklaStructuresPath>
+    <TeklaPluginDeployDir Condition="'$(TeklaPluginDeployDir)' == ''">D:\Program Files\Tekla Structures\2017\nt\bin\plugins</TeklaPluginDeployDir>
+    <TeklaCommonMacroDeployDir Condition="'$(TeklaCommonMacroDeployDir)' == ''">D:\Program Files\Tekla Structures\2017\Environments\common\macros\modeling</TeklaCommonMacroDeployDir>
+    <TeklaCommonMacroRootDeployDir Condition="'$(TeklaCommonMacroRootDeployDir)' == ''">D:\Program Files\Tekla Structures\2017\Environments\common\macros</TeklaCommonMacroRootDeployDir>
+    <TeklaChinaMacroDeployDir Condition="'$(TeklaChinaMacroDeployDir)' == ''">D:\Program Files\Tekla Structures\2017\Environments\china\macros\modeling</TeklaChinaMacroDeployDir>
+    <TeklaChinaMacroRootDeployDir Condition="'$(TeklaChinaMacroRootDeployDir)' == ''">D:\Program Files\Tekla Structures\2017\Environments\china\macros</TeklaChinaMacroRootDeployDir>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <ResolvedTeklaPluginsPath Condition="'$(ResolvedTeklaPluginsPath)' == '' and Exists('$(TeklaStructuresPath)\Tekla.Structures.Model.dll')">$(TeklaStructuresPath)</ResolvedTeklaPluginsPath>
+    <ResolvedTeklaPluginsPath Condition="'$(ResolvedTeklaPluginsPath)' == '' and Exists('$(TeklaStructuresPath)\plugins\Tekla.Structures.Model.dll')">$(TeklaStructuresPath)\plugins</ResolvedTeklaPluginsPath>
+    <ResolvedTeklaPluginsPath Condition="'$(ResolvedTeklaPluginsPath)' == '' and Exists('$(TeklaStructuresPath)\nt\bin\plugins\Tekla.Structures.Model.dll')">$(TeklaStructuresPath)\nt\bin\plugins</ResolvedTeklaPluginsPath>
+    <ResolvedTeklaPluginsPath Condition="'$(ResolvedTeklaPluginsPath)' == '' and Exists('$(TeklaStructuresPath)\nt\bin\Tekla.Structures.Model.dll')">$(TeklaStructuresPath)\nt\bin</ResolvedTeklaPluginsPath>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Reference Include="System" />
+    <Reference Include="System.Core" />
+    <Reference Include="System.Drawing" />
+    <Reference Include="System.Windows.Forms" />
+    <Reference Include="System.Runtime.Serialization" />
+    <Reference Include="Tekla.Structures">
+      <HintPath>$(ResolvedTeklaPluginsPath)\Tekla.Structures.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="Tekla.Structures.Model">
+      <HintPath>$(ResolvedTeklaPluginsPath)\Tekla.Structures.Model.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Remove="Macros\**\*.cs" />
+    <None Include="Macros\TeklaBodyBracketExportMacro.cs">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </None>
+  </ItemGroup>
+
+  <Target Name="EnsureTeklaReferences" BeforeTargets="ResolveReferences">
+    <Message Importance="High" Text="TeklaStructuresPath=$(TeklaStructuresPath)" />
+    <Message Importance="High" Text="ResolvedTeklaPluginsPath=$(ResolvedTeklaPluginsPath)" />
+    <Error Condition="'$(ResolvedTeklaPluginsPath)' == '' or !Exists('$(ResolvedTeklaPluginsPath)\Tekla.Structures.Model.dll')"
+           Text="Tekla Open API references were not found. Pass either the Tekla install root, the plugins folder, or the exact bin folder. Examples: /p:TeklaStructuresPath=&quot;D:\Program Files\Tekla Structures\2017&quot; or /p:TeklaStructuresPath=&quot;D:\Program Files\Tekla Structures\2017\nt\bin\plugins&quot;." />
+  </Target>
+
+  <Target Name="DeployToTekla" AfterTargets="Build" Condition="'$(Configuration)' == 'Release' and Exists('$(TeklaPluginDeployDir)')">
+    <ItemGroup>
+      <DeployFiles Include="$(TargetPath)" />
+      <DeployFiles Include="$(TargetPath).config" Condition="Exists('$(TargetPath).config')" />
+      <DeployFiles Include="$(TargetDir)$(TargetName).pdb" Condition="Exists('$(TargetDir)$(TargetName).pdb')" />
+      <DeployDocs Include="$(MSBuildProjectDirectory)\README.md" />
+      <DeployMacroFiles Include="$(MSBuildProjectDirectory)\Macros\TeklaBodyBracketExportMacro.cs" />
+    </ItemGroup>
+
+    <Message Text="Deploying TeklaBodyBracketRecognition exporter to $(TeklaPluginDeployDir)" Importance="high" />
+    <Copy SourceFiles="@(DeployFiles)" DestinationFolder="$(TeklaPluginDeployDir)" SkipUnchangedFiles="true" />
+    <Copy SourceFiles="@(DeployDocs)" DestinationFolder="$(TeklaPluginDeployDir)" SkipUnchangedFiles="true" />
+    <Copy SourceFiles="@(DeployMacroFiles)" DestinationFolder="$(TeklaCommonMacroDeployDir)" SkipUnchangedFiles="true" Condition="Exists('$(TeklaCommonMacroDeployDir)')" />
+    <Copy SourceFiles="@(DeployMacroFiles)" DestinationFolder="$(TeklaCommonMacroRootDeployDir)" SkipUnchangedFiles="true" Condition="Exists('$(TeklaCommonMacroRootDeployDir)')" />
+    <Copy SourceFiles="@(DeployMacroFiles)" DestinationFolder="$(TeklaChinaMacroDeployDir)" SkipUnchangedFiles="true" Condition="Exists('$(TeklaChinaMacroDeployDir)')" />
+    <Copy SourceFiles="@(DeployMacroFiles)" DestinationFolder="$(TeklaChinaMacroRootDeployDir)" SkipUnchangedFiles="true" Condition="Exists('$(TeklaChinaMacroRootDeployDir)')" />
+  </Target>
+</Project>

@@ -1,0 +1,2073 @@
+# 主材识别重构状态
+
+> 历史档案说明
+>
+> 本文档已转为历史累计状态档案，不再作为当前活跃执行真源。
+>
+> 当前请优先使用：
+>
+> - [PROJECT_STATUS_V2.zh-CN.md](</I:/autoteklasuanfa/PROJECT_STATUS_V2.zh-CN.md>)
+> - [PROJECT_TASKLIST_V2.zh-CN.md](</I:/autoteklasuanfa/PROJECT_TASKLIST_V2.zh-CN.md>)
+> - [PROJECT_REFOCUS_PLAN.zh-CN.md](</I:/autoteklasuanfa/PROJECT_REFOCUS_PLAN.zh-CN.md>)
+> - [PROJECT_ARCHIVE_NOTICE.zh-CN.md](</I:/autoteklasuanfa/PROJECT_ARCHIVE_NOTICE.zh-CN.md>)
+
+## 当前日期
+
+- `2026-04-25`
+
+## 2026-04-29 当前补充
+
+- 已新增旧派生字段运行时依赖排查真源文档：
+  - [OLD_DERIVED_RUNTIME_DEPENDENCY_AUDIT.zh-CN.md](</I:/autoteklasuanfa/OLD_DERIVED_RUNTIME_DEPENDENCY_AUDIT.zh-CN.md>)
+  - 当前已先完成第一轮盘点，并明确：
+    - `EndProximity / NearMemberStart / NearMemberEnd`
+      - 分区主判定已从旧缓存字段切到当前 provisional axis 同源重算
+      - 但 importer 仍保留导入，后续还需继续扫残余运行时读取点
+    - `SourceMemberMainClassCode`
+      - 阶段 6 主家族判定已去依赖
+      - coarse observation 层仍保留 direct signal 弱依赖
+    - `ImportSynthesisKind`
+      - 仍参与家族映射、coarse direct signal、full-run source target 选择
+      - 当前确认为最大的旧派生运行时残留字段之一
+    - `SemanticRole / SemanticRoleScore`
+      - 当前仍作为阶段 2 的外部先验运行时输入
+      - 暂不作为“旧结论残留”直接删除
+    - `BodyDescriptorFamily / BodyDescriptorSectionType`
+      - 不属于旧启发式残留，但属于摘要派生字段
+      - 后续仍需继续厘清“辅助一致性”与“主判据”边界
+
+- 已完成粗分类观察层旧 H 借力路径清理：
+  - 已从 [CoarseMainClassObservationCollector.cs](</I:/autoteklasuanfa/src/TeklaBodyBracketRecognition.App/CoarseMainClassObservationCollector.cs>) 删除
+    `DIRECT_H_WITH_NARROW_CANDIDATE_SET`
+  - 当前粗分类观察层不再允许“候选集只剩 1-2 块主板时，借上游 `SourceMemberMainClassCode = H` 直接抬成 H”
+- 已对活跃基线复跑确认：
+  - [run_body_bracket_real_13_no_h_fallback_v1](/I:/autoteklasuanfa/.tmpresults/run_body_bracket_real_13_no_h_fallback_v1)
+    - `FallbackCount = 0`
+    - 原先 5 条旧借力样本：
+      - `T2-12MJ-1`
+      - `T2-12MJ-4`
+      - `T2-13GL-20`
+      - `T2-13MJ-2`
+      - `T2-13MJ-4`
+    - 现全部回落为：
+      - `CoarseMainClassCode = PRIMARY_PLATE_BODY`
+      - `ReasonCode = SINGLE_PLATE_STATION_MAJORITY`
+  - [run_body_bracket_real_14_no_h_fallback_v1](/I:/autoteklasuanfa/.tmpresults/run_body_bracket_real_14_no_h_fallback_v1)
+    - `FallbackCount = 0`
+    - `T2-13GL-9 / 10 / 16 / 21 / 23 / 24` 仍稳定为：
+      - `CoarseMainClassCode = H`
+      - `ReasonCode = WEB_FLANGE_SECTION_CONSENSUS`
+- 当前结论收口为：
+  - 旧 `DIRECT_H_WITH_NARROW_CANDIDATE_SET` 确认为脏口子，已移除
+  - 粗分类观察层的 `H` 现在只允许来自真实 `web + flange` 多切片共识
+  - `run_body_bracket_real_12_box_extended_loop_v4` 对应输入缓存目录当前未在 `I:\autoteklasuanfa\.tmpdata` 下找到，尚未补跑
+- 已完成 `T2-13GL-20` 一类“主板候选集只剩双主板”的根因修复：
+  - 已确认根因不是下游 collector 误杀，而是 [BodyCandidatePartitioner.cs](</I:/autoteklasuanfa/src/TeklaBodyBracketRecognition.Core/Algorithms/BodyCandidatePartitioner.cs>)
+    在同一层分区逻辑里混用了两套纵向位置信号：
+    - `coverage / projectedInterval` 走的是当前 provisional axis 的现场重算
+    - `nearStableZone` 却仍吃导入缓存里的旧 `EndProximity`
+  - 这会导致像 `T2-13GL-20` 的长腹板 `269901014` 出现：
+    - 当前重算 `AxisInterval = 0..2048.919`
+    - `LongitudinalCoverageEstimate = 1`
+    - 但旧缓存 `EndProximity = NearStart=true / NearEnd=false`
+    - 最终被误判成 `single-ended local part`
+    - 只落到 `PartitionClass = 2`
+  - 当前已把 `nearStableZone` 改为基于当前 `projectedInterval + assemblySpan` 同源重算，不再直接依赖缓存导入的旧 `EndProximity`
+  - 已对真实 [run_body_bracket_real_13_gl20_interval_consistency_v1](/I:/autoteklasuanfa/.tmpresults/run_body_bracket_real_13_gl20_interval_consistency_v1) 复跑确认：
+    - `T2-13GL-20`
+      - `CandidatePartIds = 269901014,269901133,269901147`
+      - `CandidatePartCount = 3`
+      - `HStationCount = 5`
+      - `CoarseMainClassCode = H`
+      - `ReasonCode = WEB_FLANGE_SECTION_CONSENSUS`
+    - 同时 `T2-12MJ-1 / T2-12MJ-4 / T2-13MJ-2 / T2-13MJ-4`
+      仍保持：
+      - `CoarseMainClassCode = PRIMARY_PLATE_BODY`
+      - `ReasonCode = SINGLE_PLATE_STATION_MAJORITY`
+
+## 当前目标
+
+将主材识别从“启发式板链投票器”重构为“工程定义驱动的主体截面证明器”。
+
+## 项目整编入口
+
+- 当前项目已进入“先收拢、再推进”的阶段，统一高层计划见：
+  - [PROJECT_REFOCUS_PLAN.zh-CN.md](</I:/autoteklasuanfa/PROJECT_REFOCUS_PLAN.zh-CN.md>)
+- 后续关于：
+  - 已冻结结论
+  - 已废弃口径
+  - 新分支策略
+  - 下一阶段执行顺序
+  - 统一以该文档为高层准绳
+
+## 阶段 5 冻结入口
+
+- 当前阶段 5 已冻结稳定规则总表：
+  - [STAGE5_STABLE_RULES_FREEZE.zh-CN.md](</I:/autoteklasuanfa/STAGE5_STABLE_RULES_FREEZE.zh-CN.md>)
+
+## 当前执行约束
+
+- `2026-04-28` 已把阶段 6 最终家族判定对上游 `SourceMemberMainClassCode` 的运行时依赖正式摘除：
+  - 当前 [BodyFamilyDefinitionEvaluator.cs](</I:/autoteklasuanfa/src/TeklaBodyBracketRecognition.App/BodyFamilyDefinitionEvaluator.cs>) 已不再用上游 `H / BOX` 打分类结果驱动最终家族归属
+  - `BOX / H / 变截面 BOX / deferred H hint` 这几处原先混入 `SourceMemberMainClassCode` 的条件，现已切回：
+    - 下游 `LeadClause`
+    - `LeadClauseVerdict / PromotionReadiness`
+    - `BodyDescriptorFamily / BodyDescriptorSectionType`
+    - `ImportSynthesisKind`
+  - 当前上游 `SourceMemberMainClassCode` 仅保留为：
+    - source audit 字段
+    - sidecar / 对账 / 异常排查参考
+  - 已执行 `dotnet build I:\autoteklasuanfa\TeklaBodyBracketRecognition.sln`，结果：
+    - `0` warning
+    - `0` error
+- `2026-04-28` 已对上游 `I:\xingcaisuanfa\TeklaSectionClassifier` 完成一轮真正的 longitudinal / sampling / enclosure 串接修正：
+  - 已确认旧 `Tekla2017MemberExtractor.BuildGuidePolyline(...)` 的根因是：
+    - 不是按线段连通关系重建 guide
+    - 而是把候选边端点按主轴投影排序后直接相连
+    - 这会把折线主体误拼成边界折返锯齿
+  - 当前上游已改为：
+    - 先从 `PolyBeam` 的 longitudinal solid-edge 候选里构图
+    - 再按投影跨度筛选主组件
+    - 并对成对平行主组件做“同里程投影聚类取中点”，输出真实 member centerline
+    - 已避免 `YPGL-5` 这类样本继续落到单边板边线
+  - 同时已确认上游旧 `ApproximateSectionIntersectionService` / `DefaultSectionSampler` / `DefaultAnomalyDetector`
+    之前虽然导出了 `GuidePolyline / AxisSegments`，但 sampling 仍在吃 `member.Member.MainAxis`
+  - 当前已补上：
+    - 新增 `LongitudinalAxisResolver.cs`
+    - 让上游 station length / station frame / part longitudinal interval 都优先消费 `AxisSegments`
+    - `ApproximateSectionIntersectionService` 的 section plane / 2D 投影坐标也已切到当前 longitudinal station frame
+  - 同时已把上游 `BuildFeatures(...)` 的 enclosure 从“计数近似”收紧为：
+    - 边界覆盖
+    - 四角接触
+    - 且上下边只认横向主导、左右边只认竖向主导
+  - 已用临时重建缓存
+    [run_body_bracket_real_04_upstream_axis_rebuilt_v2](</I:/autoteklasuanfa/.tmpdata/run_body_bracket_real_04_upstream_axis_rebuilt_v2>)
+    + 上游 Runner 离线重算复核：
+    - `T3-1GKZ-3`：仍为 `BOX`
+    - `T3-1HXZ-2`：回到 `IRREGULAR + review`
+    - `T3-2YPGL-5`：在新纵向轴和新 enclosure 口径下稳定为 `BOX`
+  - 当前这一步已说明：
+    - 上游“导出层算新轴、采样层却仍吃旧主轴”的断链已补上
+    - 上游 enclosure 不再依赖 `wallCandidates >= 4` 或 `2 flange + 2 web => 0.45` 这种计数近似
+  - 当前仍未做的最后一步是：
+    - 从真实 Tekla 模型重新导出一份正式缓存，再用下游全链路复跑，确认真实导出物也与这轮临时重建缓存一致
+- `2026-04-28` 已继续用新离线数据 [run_body_bracket_real_11](</I:/xingcaisuanfa/cache/run_body_bracket_real_11>) 验证上游纵向轴选择规则，并确认还存在第二层上游 root cause：
+  - 当前 `T3-4GZ-7 / T3-4GZ-10` 的主件本体其实都是：
+    - `Beam`
+    - `PL16*1000`
+    - `MainAxis.Length ≈ 4145`
+    - 且主件 `SolidEdges = 97`
+  - 但旧上游 `HasUsableGuideSegments(...)` 只允许 `PolyBeam` 参与 longitudinal guide 候选
+  - 结果真实导出缓存里：
+    - `T3-4GZ-10` 被短附件 guide 误导成 `AxisLength ≈ 600`
+    - `T3-4GZ-7` 被误导成 `AxisLength ≈ 2984.661`
+    - 下游随之出现：
+      - `T3-4GZ-10`：`Stations = []`
+      - `T3-4GZ-7`：`BODY_CANDIDATE_MISSING_AFTER_CLEANING`
+  - 当前已把上游 [Tekla2017MemberExtractor.cs](</I:/xingcaisuanfa/TeklaSectionClassifier/Tekla2017MemberExtractor.cs>) 的 guide 候选范围从：
+    - `PolyBeam only`
+    - 扩到 `PolyBeam + Beam`
+  - 已用临时重建缓存
+    [run_body_bracket_real_11_upstream_axis_rebuilt_v1](</I:/autoteklasuanfa/.tmpdata/run_body_bracket_real_11_upstream_axis_rebuilt_v1>)
+    + 下游全链路复跑确认：
+    - `T3-4GZ-7`：
+      - `Coarse = BOX`
+      - `ClosedLoopStationCount = 5`
+      - `LeadClause = BOX_CLOSED_LOOP_OPPOSITE_WALL_CLAUSE`
+      - `ReadyForPromotion`
+    - `T3-4GZ-10`：
+      - `Coarse = BOX`
+      - `ClosedLoopStationCount = 5`
+      - `LeadClause = BOX_CLOSED_LOOP_OPPOSITE_WALL_CLAUSE`
+      - `ReadyForPromotion`
+    - 同批 `T3-4HXZ-4 / 15` 仍保持：
+      - 上游离线重算 `IRREGULAR + review`
+      - 下游仍走 `PRIMARY_PLATE_CONTINUITY_CLAUSE`
+  - 当前这说明：
+    - 上游除了“guide 怎么重建”之外，“guide 从哪个 part 选”这一层也已经补上
+    - `Beam` 主件不能再被排除在 longitudinal guide 候选之外
+- `2026-04-28` 已把 `ClosedLoopCandidate` 从“端点成环”继续收紧为“双证据闭环”：
+  - 当前 [SectionClosedLoopEvidence.cs](</I:/autoteklasuanfa/src/TeklaBodyBracketRecognition.Core/Algorithms/SectionClosedLoopEvidence.cs>) 已改为：
+    - 先判 `endpoint-cycle` 真实成环
+    - 再判 `convex-hull boundary coverage` 的真实围合边界
+  - 这一步的目的不是继续放宽 `BOX`，而是把：
+    - `GKZ` 这类正规箱体保住
+    - `HXZ` 这类“四边接触但并未真实围合”的假闭环继续拦住
+  - 已对真实 [run_body_bracket_real_04_true_closed_loop_check_v3](/I:/autoteklasuanfa/.tmpresults/run_body_bracket_real_04_true_closed_loop_check_v3) 复跑确认：
+    - `T3-1GKZ-3`：
+      - `ClosedLoopStationCount = 5`
+      - `CoarseMainClass = BOX`
+    - `T3-1HXZ-2`：
+      - `ClosedLoopStationCount = 0`
+      - `CoarseMainClass = NONE`
+    - `T3-2YPGL-5`：
+      - 仍为 `ClosedLoopStationCount = 0`
+      - 当前残余问题已收敛为：折线变截面 `BOX` 在 priority station 上并未形成当前规则可证明的“真实围合边界”
+  - 当前这说明：
+    - “四边接触=闭环”的旧误报口子已经被进一步堵上
+    - 但 `YPGL-5` 这类折线变截面箱体，还需要单独分析“站位选择 / 斜截面几何 / 围合证明”中的哪一层在丢证据
+- `2026-04-27` 已校正源 `MainClass` 直达映射口径：
+  - 已确认上游 `I:\xingcaisuanfa\TeklaSectionClassifier\ClassificationModels.cs` 的 `MemberClass` 枚举为：
+    - `H=1 / Box=2 / T=3 / Cross=4 / Angle=5 / Pipe=6 / Irregular=7`
+  - 已修正 [DefinitionClauseDecisionFullRunSourceCollector.cs](</I:/autoteklasuanfa/src/TeklaBodyBracketRecognition.App/DefinitionClauseDecisionFullRunSourceCollector.cs>)：
+    - `4 => CROSS`
+    - `5 => L`
+    - `6 => PIPE`
+  - 已补齐 [CoarseMainClassObservationCollector.cs](</I:/autoteklasuanfa/src/TeklaBodyBracketRecognition.App/CoarseMainClassObservationCollector.cs>) 的 `CROSS` 中文标签
+  - 已对真实 [run_body_bracket_real_04_mainclass_mapping_fix_check](/I:/autoteklasuanfa/.tmpresults/run_body_bracket_real_04_mainclass_mapping_fix_check) 复跑确认：
+    - `T3-2GL-78` 现为 `SourceMemberMainClassCode = L`
+    - `SourceSemanticSectionType = STANDARD_ANGLE`
+    - 同批 `34` 条角钢样本均已稳定显示为 `L + STANDARD_ANGLE`
+- `2026-04-27` 已把“属性直达”和“粗分类观察”正式拆成分叉路线：
+  - 当前 [CoarseMainClassObservationCollector.cs](</I:/autoteklasuanfa/src/TeklaBodyBracketRecognition.App/CoarseMainClassObservationCollector.cs>) 对 `BodyDescriptorFamily = StandardSection` 直接旁路
+  - 这类构件不再产出 `CoarseMainClassCode/Subtype`，统一落：
+    - `CoarseMainClassReasonCode = ATTRIBUTE_DIRECT_BYPASS`
+    - `CoarseMainClassReasonLabelZh = 标准截面型材已走属性直达，不进入粗分类观察路线`
+  - 已对真实 [run_body_bracket_real_04_attribute_direct_bypass_check](/I:/autoteklasuanfa/.tmpresults/run_body_bracket_real_04_attribute_direct_bypass_check) 复跑确认：
+    - `T3-2GL-78` 不再落入 `PRIMARY_PLATE_BODY`
+    - `run_body_bracket_real_04` 内 `34` 条 `STANDARD_ANGLE` 样本全部命中 `ATTRIBUTE_DIRECT_BYPASS`
+- `2026-04-22` 已撤回本地 `worker` 分支，不再使用仓库内常驻脚本推进。
+- 后续推进节奏以当前线程的 Codex 心跳为准，仓库只保留主材识别主线代码、状态板和验证工件。
+- `2026-04-25` 已正式移除仓库中的旧启发式主体/加劲肘板识别链：
+  - 已删除 `AssemblyAnalyzer`、`BodyRecognizer`、`BracketRecognizer` 与旧 `Results.cs`
+  - `Program.cs` 不再调用旧 `Analyze(...)` 主链，也不再导出旧 `batch-summary.json`
+  - `body-main-material-*` 摘要已切到阶段 5 proof 主链 + source semantic 口径，不再依赖旧启发式兜底
+- `2026-04-25` 已对 `Program.cs` 做第一轮编排层收口：
+  - 已抽出单 assembly proof 流水线 helper
+  - 已抽出批量工件容器与统一落盘 helper
+  - 已用 `run_body_bracket_real_08` 复跑确认结构重构前后结果一致
+- `2026-04-25` 已完成 `body-main-material-*` 支撑层第二轮抽离：
+  - 新增 [BodyMaterialSupport.cs](</I:/autoteklasuanfa/src/TeklaBodyBracketRecognition.App/BodyMaterialSupport.cs>)
+  - `BuildBodyMaterialSummary / Explanation / CSV / Markdown` 已从 [Program.cs](</I:/autoteklasuanfa/src/TeklaBodyBracketRecognition.App/Program.cs>) 挪出
+  - 已删除 `Program.cs` 中对应重复实现，仅保留调用与 `BodyMaterialPartRow / SourceSeedRow` 映射
+  - 已对真实 [run_body_bracket_real_08_bodymaterial_extract_check](/I:/autoteklasuanfa/.tmpresults/run_body_bracket_real_08_bodymaterial_extract_check) 复跑，结果继续保持：
+    - `Family = BOX`
+    - `FamilySubtype = CLOSED_LOOP_BOX`
+    - `ProfileCategory/Profile = BUILTUP_BOX`
+- `2026-04-25` 已完成 `pipeline artifact` 组装层第三轮抽离：
+  - 新增 [PipelineArtifactSupport.cs](</I:/autoteklasuanfa/src/TeklaBodyBracketRecognition.App/PipelineArtifactSupport.cs>)
+  - `BodyCandidatePartition/StableBodyZone/SectionStation/SectionTrace/Topology/CoreBodyProof` 的 view-output builder
+  - 以及 `SectionTraceTopologySummaryRow` 聚合 builder
+  - 已从 [Program.cs](</I:/autoteklasuanfa/src/TeklaBodyBracketRecognition.App/Program.cs>) 挪出
+  - 已对真实 [run_body_bracket_real_08_pipeline_artifact_extract_check](/I:/autoteklasuanfa/.tmpresults/run_body_bracket_real_08_pipeline_artifact_extract_check) 复跑，结果继续保持：
+    - `Family = BOX`
+    - `FamilySubtype = CLOSED_LOOP_BOX`
+    - `ProfileCategory/Profile = BUILTUP_BOX`
+- `2026-04-25` 已完成阶段 2-4.5 摘要层第四轮抽离：
+  - 新增 [PipelineSummarySupport.cs](</I:/autoteklasuanfa/src/TeklaBodyBracketRecognition.App/PipelineSummarySupport.cs>)
+  - 已把 `BodyCandidatePartition / StableBodyZone / SectionTrace / SectionTopologyAnalysis` 四个 Markdown summary builder
+  - 从 [Program.cs](</I:/autoteklasuanfa/src/TeklaBodyBracketRecognition.App/Program.cs>) 挪出
+  - 已对真实 [run_body_bracket_real_08_pipeline_summary_extract_check](/I:/autoteklasuanfa/.tmpresults/run_body_bracket_real_08_pipeline_summary_extract_check) 复跑，结果继续保持：
+    - `Family = BOX`
+    - `FamilySubtype = CLOSED_LOOP_BOX`
+    - `ProfileCategory/Profile = BUILTUP_BOX`
+- `2026-04-25` 已完成阶段 5 摘要层第五轮抽离：
+  - 新增 [CoreBodyProofSummarySupport.cs](</I:/autoteklasuanfa/src/TeklaBodyBracketRecognition.App/CoreBodyProofSummarySupport.cs>)
+  - 已把 `CoreBodyProofSummaryMarkdown / TopologyRewriteSummaryMarkdown`
+  - 以及对应的 `TopologyRewrite*` 聚合 helper / private record
+  - 从 [Program.cs](</I:/autoteklasuanfa/src/TeklaBodyBracketRecognition.App/Program.cs>) 挪出
+  - 已对真实 [run_body_bracket_real_08_coreproof_summary_extract_check](/I:/autoteklasuanfa/.tmpresults/run_body_bracket_real_08_coreproof_summary_extract_check) 复跑，结果继续保持：
+    - `Family = BOX`
+    - `FamilySubtype = CLOSED_LOOP_BOX`
+    - `ProfileCategory/Profile = BUILTUP_BOX`
+- `2026-04-25` 已完成旧主体描述字段命名的第一轮清理：
+  - 当前主线输出/模型/collector/Excel 已切到：
+    - `BodyDescriptorFamily`
+    - `BodyDescriptorSectionType`
+  - 本轮已同步更新：
+    - [Program.cs](</I:/autoteklasuanfa/src/TeklaBodyBracketRecognition.App/Program.cs>)
+    - [BodyMaterialSupport.cs](</I:/autoteklasuanfa/src/TeklaBodyBracketRecognition.App/BodyMaterialSupport.cs>)
+    - [BodyFamilyProofModels.cs](</I:/autoteklasuanfa/src/TeklaBodyBracketRecognition.App/BodyFamilyProofModels.cs>)
+    - [DefinitionClauseDecisionFullRunSourceModels.cs](</I:/autoteklasuanfa/src/TeklaBodyBracketRecognition.App/DefinitionClauseDecisionFullRunSourceModels.cs>)
+    - [DefinitionClauseDecisionFullRunSnapshotSeedModels.cs](</I:/autoteklasuanfa/src/TeklaBodyBracketRecognition.App/DefinitionClauseDecisionFullRunSnapshotSeedModels.cs>)
+    - [DefinitionClauseDecisionFullRunSourceCollector.cs](</I:/autoteklasuanfa/src/TeklaBodyBracketRecognition.App/DefinitionClauseDecisionFullRunSourceCollector.cs>)
+    - [BodyFamilyDefinitionEvaluator.cs](</I:/autoteklasuanfa/src/TeklaBodyBracketRecognition.App/BodyFamilyDefinitionEvaluator.cs>)
+    - [Export-RecognitionExcels.py](</I:/autoteklasuanfa/tools/Export-RecognitionExcels.py>)
+  - 已对真实 [run_body_bracket_real_08_body_descriptor_rename_check](/I:/autoteklasuanfa/.tmpresults/run_body_bracket_real_08_body_descriptor_rename_check) 复跑确认：
+    - `BodyDescriptorFamily = BuiltUpBox`
+    - `BodyDescriptorSectionType = BUILTUP_BOX`
+    - `Family = BOX`
+    - `FamilySubtype = CLOSED_LOOP_BOX`
+    - `ProfileCategory/Profile = BUILTUP_BOX`
+- `2026-04-25` 已完成 `Program.cs` 尾部模型定义的第六轮结构抽离：
+  - 新增 [BodyMaterialModels.cs](</I:/autoteklasuanfa/src/TeklaBodyBracketRecognition.App/BodyMaterialModels.cs>)
+  - 新增 [PipelineArtifactModels.cs](</I:/autoteklasuanfa/src/TeklaBodyBracketRecognition.App/PipelineArtifactModels.cs>)
+  - 新增 [PipelineRunModels.cs](</I:/autoteklasuanfa/src/TeklaBodyBracketRecognition.App/PipelineRunModels.cs>)
+  - 已把 `BodyMaterial* / CoreBodyPartSummary / *ViewOutput / SectionTraceTopologySummaryRow / ProofPipelineResult / PipelineRunResult`
+  - 从 [Program.cs](</I:/autoteklasuanfa/src/TeklaBodyBracketRecognition.App/Program.cs>) 挪出
+  - 并顺手删除当前 App 主线未使用的 `AnalysisSummary` 与本地 `SanitizeFileName`
+  - 已对真实 [run_body_bracket_real_05_model_extract_check](/I:/autoteklasuanfa/.tmpresults/run_body_bracket_real_05_model_extract_check) 复跑确认：
+    - `AssemblyCount = 119`
+    - `AdjudicatedCount = 90`
+    - `DeferredCount = 29`
+    - `ResolvedCount = 90`
+    - `ReviewBypassCount = 29`
+    - `H = 76 / STANDARD_SECTION = 41 / BOX = 1 / NONE = 1`
+- `2026-04-25` 已完成批量工件落盘层的第七轮结构抽离：
+  - 新增 [BatchArtifactWriter.cs](</I:/autoteklasuanfa/src/TeklaBodyBracketRecognition.App/BatchArtifactWriter.cs>)
+  - 已把 `BatchArtifacts` 容器与 `WriteBatchArtifacts / WriteJsonArtifact` 从 [Program.cs](</I:/autoteklasuanfa/src/TeklaBodyBracketRecognition.App/Program.cs>) 挪出
+  - 当前 [Program.cs](</I:/autoteklasuanfa/src/TeklaBodyBracketRecognition.App/Program.cs>) 只保留：
+    - 入口参数处理
+    - 服务装配
+    - assembly 级流水线编排
+    - 输出目录解析
+  - 已对真实 [run_body_bracket_real_05_batchwriter_extract_check](/I:/autoteklasuanfa/.tmpresults/run_body_bracket_real_05_batchwriter_extract_check) 复跑确认：
+    - `AssemblyCount = 119`
+    - `AdjudicatedCount = 90`
+    - `DeferredCount = 29`
+    - `ResolvedCount = 90`
+    - `ReviewBypassCount = 29`
+    - `H = 76 / STANDARD_SECTION = 41 / BOX = 1 / NONE = 1`
+- `2026-04-25` 已完成服务装配与离线 workflow 的第八轮结构抽离：
+  - 新增 [AnalysisPipelineServices.cs](</I:/autoteklasuanfa/src/TeklaBodyBracketRecognition.App/AnalysisPipelineServices.cs>)
+  - 新增 [OfflineBatchWorkflow.cs](</I:/autoteklasuanfa/src/TeklaBodyBracketRecognition.App/OfflineBatchWorkflow.cs>)
+  - 已把 `AnalysisPipelineServices / ProcessJob / RunProofPipeline` 从 [Program.cs](</I:/autoteklasuanfa/src/TeklaBodyBracketRecognition.App/Program.cs>) 挪出
+  - 当前 [Program.cs](</I:/autoteklasuanfa/src/TeklaBodyBracketRecognition.App/Program.cs>) 进一步收口为：
+    - 早期命令短路
+    - 参数/目录处理
+    - 批量执行主线调度
+  - 已对真实 [run_body_bracket_real_05_workflow_extract_check](/I:/autoteklasuanfa/.tmpresults/run_body_bracket_real_05_workflow_extract_check) 复跑确认：
+    - `AssemblyCount = 119`
+    - `AdjudicatedCount = 90`
+    - `DeferredCount = 29`
+    - `ResolvedCount = 90`
+    - `ReviewBypassCount = 29`
+    - `H = 76 / STANDARD_SECTION = 41 / BOX = 1 / NONE = 1`
+- `2026-04-25` 已完成入口壳层的第九轮结构抽离：
+  - 新增 [OfflineRecognitionApp.cs](</I:/autoteklasuanfa/src/TeklaBodyBracketRecognition.App/OfflineRecognitionApp.cs>)
+  - 已把 sample / batch 主线调度与输出目录解析从 [Program.cs](</I:/autoteklasuanfa/src/TeklaBodyBracketRecognition.App/Program.cs>) 挪出
+  - 当前 [Program.cs](</I:/autoteklasuanfa/src/TeklaBodyBracketRecognition.App/Program.cs>) 只保留：
+    - `JsonOptions`
+    - `AppEarlyCommandDispatcher.TryRun(...)`
+    - 调用 `OfflineRecognitionApp.Run(...)`
+  - 已对真实 [run_body_bracket_real_05_appentry_extract_check](/I:/autoteklasuanfa/.tmpresults/run_body_bracket_real_05_appentry_extract_check) 复跑确认：
+    - `AssemblyCount = 119`
+    - `AdjudicatedCount = 90`
+    - `DeferredCount = 29`
+    - `ResolvedCount = 90`
+    - `ReviewBypassCount = 29`
+    - `H = 76 / STANDARD_SECTION = 41 / BOX = 1 / NONE = 1`
+- `2026-04-25` 已完成 batch 主线协调层的第十轮结构抽离：
+  - 新增 [OfflineRecognitionBatchRunner.cs](</I:/autoteklasuanfa/src/TeklaBodyBracketRecognition.App/OfflineRecognitionBatchRunner.cs>)
+  - 已把 batch 主线中的：
+    - 输入路径解析
+    - job 加载
+    - full-run source / family proof / profile resolution 串接
+    - batch artifact 落盘
+    - 从 [OfflineRecognitionApp.cs](</I:/autoteklasuanfa/src/TeklaBodyBracketRecognition.App/OfflineRecognitionApp.cs>) 挪出
+  - 当前 [OfflineRecognitionApp.cs](</I:/autoteklasuanfa/src/TeklaBodyBracketRecognition.App/OfflineRecognitionApp.cs>) 仅保留 sample/batch 分流
+  - 已对真实 [run_body_bracket_real_05_batchrunner_extract_check](/I:/autoteklasuanfa/.tmpresults/run_body_bracket_real_05_batchrunner_extract_check) 复跑确认：
+    - `AssemblyCount = 119`
+    - `AdjudicatedCount = 90`
+    - `DeferredCount = 29`
+    - `ResolvedCount = 90`
+    - `ReviewBypassCount = 29`
+    - `H = 76 / STANDARD_SECTION = 41 / BOX = 1 / NONE = 1`
+- `2026-04-25` 已完成阶段 6/7 sidecar 协调层的第十一轮结构抽离：
+  - 新增 [DefinitionDrivenSidecarCoordinator.cs](</I:/autoteklasuanfa/src/TeklaBodyBracketRecognition.App/DefinitionDrivenSidecarCoordinator.cs>)
+  - 新增 [DefinitionDrivenSidecarCoordinatorResult.cs](</I:/autoteklasuanfa/src/TeklaBodyBracketRecognition.App/DefinitionDrivenSidecarCoordinatorResult.cs>)
+  - 已把 `CollectAssemblies / CollectRepresentativeParts / Evaluate / Resolve / 三路 Workflow.Run(...)`
+  - 从 [OfflineRecognitionBatchRunner.cs](</I:/autoteklasuanfa/src/TeklaBodyBracketRecognition.App/OfflineRecognitionBatchRunner.cs>) 挪出
+  - 当前这一步只收口阶段 6/7 sidecar 串接，不改任何规则或证据链
+  - 已对真实 [run_body_bracket_real_05_sidecar_coordinator_check](/I:/autoteklasuanfa/.tmpresults/run_body_bracket_real_05_sidecar_coordinator_check) 复跑确认：
+    - `AssemblyCount = 119`
+    - `AdjudicatedCount = 90`
+    - `DeferredCount = 29`
+    - `ResolvedCount = 90`
+    - `ReviewBypassCount = 29`
+    - `H = 76 / STANDARD_SECTION = 41 / BOX = 1 / NONE = 1`
+- `2026-04-25` 已再次复核当前活跃代码/文档的旧 `Heuristic*` 包袱：
+  - 当前命中主要来自：
+    - `.tmpresults` 历史验证目录名
+    - `plugins/mem0` 自带 skill 文档里的通用 `heuristics`
+    - 任务清单中的历史阶段记录/待办文案
+  - 主线代码与当前活跃输出契约未发现新的 `Heuristic*` 运行时字段残留
+- `2026-04-25` 已补上折线主体的“单一直轴误读”漏洞：
+  - `XingcaiCacheImporter` 已接入 `member_*.json` 中的 `SolidEdges`
+  - 阶段 2 已从单一 `ProvisionalBodyAxis` 投影扩展为“折线 guide + 累计长度坐标”
+  - 阶段 3/站位/截面提取已改为按折线累计坐标与所在段局部方向工作，不再把 `POLYLINE` 只当标签
+  - 并对 `PolyBeam + SpecialShape` 中“长覆盖、外包络主体板候选”开了保守 `BodyCandidate` 入口，仍需后续 proof 才能晋级
+  - 已用真实 [run_body_bracket_real_06_segmented_axis_fix](/I:/autoteklasuanfa/.tmpresults/run_body_bracket_real_06_segmented_axis_fix) 复跑确认：
+    - `T3-5GL-21` 已从“阶段 2 单轴误读导致主体站不起来”推进到“阶段 5 出现 `CONTROLLER_REASSIGNMENT_REVIEW_CLAUSE / Mixed`”
+    - 当前它已形成稳定区与 5 个 priority stations，`core-body-proof` 中两块翼缘进入 `CoreBodyPart`、腹板进入 `ReviewPart`
+    - 但阶段 6 仍未 adjudicate 为 `H`，当前剩余卡点已从几何长度方向层收敛到 `LeadClausePromotionReadiness` 未达 `ReadyForPromotion`
+- `2026-04-25` 已冻结上游 longitudinal 结构化导出契约：
+  - 新增 [LONGITUDINAL_AXIS_EXPORT_CONTRACT.zh-CN.md](</I:/autoteklasuanfa/LONGITUDINAL_AXIS_EXPORT_CONTRACT.zh-CN.md>)
+  - 已明确：
+    - 上游 `TeklaSectionClassifier` 后续应新增 `LongitudinalAxisKind / GuidePolyline / AxisSegments / LongitudinalAxisConfidence / LongitudinalAxisSource`
+    - `SolidEdges` 保留，但不再作为长期唯一主消费字段
+    - 下游阶段 2-4 应统一为“累计里程 + 当前 segment 局部方向”语义
+  - 当前下一步已收敛为：
+    - 先改 `I:\xingcaisuanfa\TeklaSectionClassifier\Models.cs`
+    - 再改 `I:\xingcaisuanfa\TeklaSectionClassifier\Tekla2017MemberExtractor.cs`
+    - 导出新缓存 smoke 后，再回接 [XingcaiCacheImporter.cs](</I:/autoteklasuanfa/src/TeklaBodyBracketRecognition.App/XingcaiCacheImporter.cs>)
+- `2026-04-25` 已完成折线主体上游 longitudinal 导出与下游阶段 2 接线的第一轮实现：
+  - 上游 `I:\xingcaisuanfa\TeklaSectionClassifier` 已新增：
+    - `MemberSnapshot.LongitudinalAxisKind`
+    - `MemberSnapshot.GuidePolyline`
+    - `MemberSnapshot.AxisSegments`
+    - `MemberSnapshot.LongitudinalAxisConfidence`
+    - `MemberSnapshot.LongitudinalAxisSource`
+    - `LongitudinalAxisSegment` DTO
+  - 上游 [Tekla2017MemberExtractor.cs](</I:/xingcaisuanfa/TeklaSectionClassifier/Tekla2017MemberExtractor.cs>) 已新增 member 级 guide/segments 生成：
+    - 无可用 guide 时回落 `STRAIGHT + MAIN_AXIS`
+    - `PolyBeam + SolidEdges` 命中可用 guide 时导出 `SOLID_EDGE_GUIDE`
+  - 下游 [XingcaiCacheImporter.cs](</I:/autoteklasuanfa/src/TeklaBodyBracketRecognition.App/XingcaiCacheImporter.cs>) 已接入 `AxisSegments`
+  - 下游 [AssemblyInput](</I:/autoteklasuanfa/src/TeklaBodyBracketRecognition.Core/Domain/Inputs.cs>) 与 [BodyCandidatePartitioner.cs](</I:/autoteklasuanfa/src/TeklaBodyBracketRecognition.Core/Algorithms/BodyCandidatePartitioner.cs>) 已支持优先消费 imported longitudinal segments
+  - 当前编译确认：
+    - `dotnet build I:\xingcaisuanfa\TeklaSectionClassifier\TeklaSectionClassifier.csproj` 通过
+    - `dotnet build I:\xingcaisuanfa\TeklaSectionClassifier.Runner\TeklaSectionClassifier.Runner.csproj` 通过
+    - `dotnet build I:\autoteklasuanfa\TeklaBodyBracketRecognition.sln` 通过
+  - 当前这一步的边界是：
+    - 新字段导出与阶段 2 接线已落地
+    - 但还未用“新导出的 member_*.json”对 `real_06 / real_05` 做 smoke
+    - 下一步应先从 `Runner` 重导一批带新字段的缓存，再验证 `T3-5GL-21`
+- `2026-04-25` 已完成 `T3-5GL-21 / real_09` 的第一轮 `BOX` 误升降噪：
+  - 已确认根因不是阶段 2 的折线长度方向回退，而是阶段 5 把“折线末端局部闭环”放大成了 assembly 级 `BOX` 提升
+  - [CoreBodyProofEngine.cs](</I:/autoteklasuanfa/src/TeklaBodyBracketRecognition.Core/Algorithms/CoreBodyProofEngine.cs>) 已新增：
+    - `HasPersistentClosedLoopEvidence(...)`
+    - `HasPersistentPairedWallEvidence(...)`
+    - `RefineTopologyRewriteFamilyRiskCode(...)`
+  - 当前 `PAIRED_BODY_PLATE_REWRITE -> PAIRED_PRIMARY_WALL_SYSTEM_RISK` 不再只靠单站局部闭环触发
+  - `closed box shell fallback` 也已改成要求“多数/持续闭环证据”，不再接受末端 1 个闭环 priority station 直接升格
+  - 已对真实 [run_body_bracket_real_09_box_persistence_fix](/I:/autoteklasuanfa/.tmpresults/run_body_bracket_real_09_box_persistence_fix) 复跑确认：
+    - `T3-5GL-21` 已从
+      - `BOX_CLOSED_LOOP_OPPOSITE_WALL_CLAUSE`
+      - `Satisfied + ReadyForPromotion`
+      - `DefinitionDrivenFamily = BOX`
+    - 收回到
+      - `GENERAL_DEFINITION_REVIEW_CLAUSE`
+      - `Mixed + HoldEffectOnly`
+      - `DefinitionDrivenFamily = NONE / Deferred`
+  - 已对真实 [run_body_bracket_real_05_box_persistence_fix](/I:/autoteklasuanfa/.tmpresults/run_body_bracket_real_05_box_persistence_fix) 复跑确认：
+    - 当前唯一稳定 `BOX` 样本仍保留为 `T2-12GL-75`
+    - 与上一轮 [run_body_bracket_real_05_sidecar_coordinator_check](/I:/autoteklasuanfa/.tmpresults/run_body_bracket_real_05_sidecar_coordinator_check) 对比，最终 `body-main-material-summary` 顶层 resolved/unresolved 口径未发生漂移
+  - 当前剩余边界是：
+    - `T3-5GL-21` 已不再被误推成 `BOX`
+    - 但还没有被重新稳定上推到 `H`
+    - 下一步应继续收紧“折线 H 主链”与“局部闭环 review”之间的装配级聚合边界
+- `2026-04-25` 已完成 `T3-5GL-21 / real_09` 的第二轮折线 `H` 主链接回：
+  - [CoreBodyProofEngine.cs](</I:/autoteklasuanfa/src/TeklaBodyBracketRecognition.Core/Algorithms/CoreBodyProofEngine.cs>) 已新增窄规则：
+    - `ResolveFoldedThreePlateHPartIds(...)`
+    - `FALLBACK_FOLDED_THREE_PLATE_H_CHAIN`
+    - 只在 `3` 块板件、`2` 强包络 + `1` 弱包络、弱单站闭环、仍带显式 topology rewrite 的折线样本上触发
+  - 同时已补上 [DefinitionClauseDecisionBridge.cs](</I:/autoteklasuanfa/src/TeklaBodyBracketRecognition.Core/Algorithms/DefinitionClauseDecisionBridge.cs>) 对
+    - `H_WEB_FLANGE_CONTINUITY_CLAUSE`
+    - `H_WEB_FLANGE_CONTINUITY_BREAK_EFFECT / REWRITE_EFFECT`
+    - 的 verdict/readiness 映射
+  - 并在 `H` 条款效果映射里，为“已进入折线 H fallback 且仍带显式 rewrite pattern 的强包络翼缘板”增加了窄 break gate，
+    让 assembly 级可收敛到 `BrokenCandidate B2/R1`
+  - 已对真实 [run_body_bracket_real_09_folded_h_fix](/I:/autoteklasuanfa/.tmpresults/run_body_bracket_real_09_folded_h_fix) 复跑确认：
+    - `T3-5GL-21` 已从
+      - `GENERAL_DEFINITION_REVIEW_CLAUSE / Mixed / HoldEffectOnly / Deferred`
+    - 推进到
+      - `H_WEB_FLANGE_CONTINUITY_CLAUSE`
+      - `Broken / ReadyForPromotion`
+      - `DefinitionDrivenFamily = H`
+      - `DefinitionDrivenSubtype = FOLDED_FLANGE_H`
+  - 已对真实 [run_body_bracket_real_05_folded_h_fix](/I:/autoteklasuanfa/.tmpresults/run_body_bracket_real_05_folded_h_fix) 复跑确认：
+    - 稳定 `BOX` 样本 `T2-12GL-75` 仍保留
+    - `FOLDED_FLANGE_H` 从 `1` 条增至 `4` 条，新增：
+      - `T2-12GL-26`
+      - `T2-12GL-27`
+      - `T2-12GL-30`
+    - 当前看起来像同类折线 H 样本一并被吃到，尚未见 `BOX` 大盘漂移
+  - 当前剩余边界是：
+    - `T3-5GL-21` 已成功回到期望 `H` 主链
+    - 但新增 `3` 条 `FOLDED_FLANGE_H` 仍值得后续做一次人工复核，确认规则半径是否正好
+
+## 阶段状态
+
+### 阶段 0：定义冻结
+
+- 状态：`已完成`
+- 本轮已完成：
+  - [MAIN_BODY_FOUNDATION_REBUILD_PLAN.zh-CN.md](</I:/autoteklasuanfa/MAIN_BODY_FOUNDATION_REBUILD_PLAN.zh-CN.md>)
+  - [MAIN_BODY_REBUILD_TASKLIST.zh-CN.md](</I:/autoteklasuanfa/MAIN_BODY_REBUILD_TASKLIST.zh-CN.md>)
+  - [MAIN_BODY_DEFINITIONS.zh-CN.md](</I:/autoteklasuanfa/MAIN_BODY_DEFINITIONS.zh-CN.md>)
+
+### 阶段 1：输出契约重构
+
+- 状态：`已完成首版落地`
+- 本轮已完成：
+  - 增加构件编号 `MemberId`
+  - 增加真实主材种子零件表 `body-main-material-source-seeds.csv`
+  - 区分启发式核心件与真实零件来源
+  - [MAIN_BODY_OUTPUT_CONTRACT.zh-CN.md](</I:/autoteklasuanfa/MAIN_BODY_OUTPUT_CONTRACT.zh-CN.md>)
+  - 在输出文件中显式加入：
+    - `ImportSynthesisKind`
+    - `BodyDescriptorFamily`
+    - `BodyDescriptorSectionType`
+    - `BodyDescriptorReviewRequired`
+  - 新增主体解释摘要：
+    - `body-main-material-explanation.json`
+    - `body-main-material-review-summary.zh-CN.md`
+  - 已在真实样本目录验证：
+    - `I:\autoteklasuanfa\.tmpresults\run_body_bracket_real_04_contract_v3`
+
+### 阶段 2：主体候选分层器
+
+- 状态：`进行中`
+- 本轮已完成：
+  - [BODY_CANDIDATE_PARTITION_DESIGN.zh-CN.md](</I:/autoteklasuanfa/BODY_CANDIDATE_PARTITION_DESIGN.zh-CN.md>)
+  - 新增首版模块：
+    - `BodyCandidatePartitioner`
+    - `BodyCandidatePartitionResult`
+  - 新增独立旁路输出：
+    - `body-candidate-partition.json`
+  - 已在真实样本目录验证：
+    - `I:\autoteklasuanfa\.tmpresults\run_body_bracket_real_04_contract_v3`
+
+### 阶段 3：稳定区与站位求解
+
+- 状态：`已完成首版原型`
+- 本轮已完成：
+  - [STABLE_BODY_ZONE_AND_SECTION_STATION_DESIGN.zh-CN.md](</I:/autoteklasuanfa/STABLE_BODY_ZONE_AND_SECTION_STATION_DESIGN.zh-CN.md>)
+  - 新增首版模块：
+    - `StableBodyZoneResolver`
+    - `SectionStationPlanner`
+  - 新增首版输出：
+    - `stable-body-zone-recognition-input.json`
+    - `stable-body-zone-real-input.json`
+    - `section-stations-recognition-input.json`
+    - `section-stations-real-input.json`
+    - `stable-body-zone-summary.zh-CN.md`
+  - 已在真实样本目录验证：
+    - `I:\autoteklasuanfa\.tmpresults\run_body_bracket_real_04_contract_v7`
+
+### 阶段 4：横截面迹线重建
+
+- 状态：`已完成首版最小原型，并补上阶段 4.5 cleaning/topology 旁路`
+- 本轮已完成：
+  - 新增首版模块：
+    - `SectionTraceExtractor`
+    - `SectionTraceCleaner`
+    - `SectionTopologyAnalyzer`
+  - 新增首版输出：
+    - `section-traces-recognition-input.json`
+    - `section-traces-real-input.json`
+    - `section-trace-cleaning-recognition-input.json`
+    - `section-trace-cleaning-real-input.json`
+    - `section-topology-recognition-input.json`
+    - `section-topology-real-input.json`
+    - `section-topology-summary.json`
+    - `section-trace-summary.zh-CN.md`
+    - `section-topology-analysis-summary.zh-CN.md`
+  - 已在真实样本目录验证：
+    - `I:\autoteklasuanfa\.tmpresults\run_body_bracket_real_04_contract_v10`
+
+### 阶段 5：主体核心证明器
+
+- 状态：`已推进到 bootstrap + remove-and-recompute + definition-clause effect 过渡版，并完成 v37 full-run 复核`
+- 本轮已完成：
+  - 新增首版模块：
+    - `CoreBodyProofEngine`
+  - 新增首版输出：
+    - `core-body-proof-recognition-input.json`
+    - `core-body-proof-real-input.json`
+    - `core-body-proof-summary.zh-CN.md`
+  - 当前判据：
+    - `priority station 持续性`
+    - `外包络支撑`
+    - `移除后重算的站位退化`
+    - `移除后的扰动指标`
+  - 已在真实样本目录验证：
+    - `I:\autoteklasuanfa\.tmpresults\run_body_bracket_real_04_contract_v11`
+    - `I:\autoteklasuanfa\.tmpresults\run_body_bracket_real_04_contract_v14`
+    - `I:\autoteklasuanfa\.tmpresults\run_body_bracket_real_04_contract_v16`
+    - `I:\autoteklasuanfa\.tmpresults\run_body_bracket_real_04_contract_v17`
+    - `I:\autoteklasuanfa\.tmpresults\run_body_bracket_real_04_contract_v18`
+    - `I:\autoteklasuanfa\.tmpresults\run_body_bracket_real_04_contract_v19`
+    - `I:\autoteklasuanfa\.tmpresults\run_body_bracket_real_04_contract_v20`
+    - `I:\autoteklasuanfa\.tmpresults\run_body_bracket_real_04_contract_v21`
+    - `I:\autoteklasuanfa\.tmpresults\run_body_bracket_real_04_contract_v22`
+    - `I:\autoteklasuanfa\.tmpresults\run_body_bracket_real_04_contract_v24`
+    - `I:\autoteklasuanfa\.tmpresults\run_body_bracket_real_04_contract_v25`
+    - `I:\autoteklasuanfa\.tmpresults\run_body_bracket_real_04_contract_v26`
+    - `I:\autoteklasuanfa\.tmpresults\run_body_bracket_real_04_contract_v27`
+    - `I:\autoteklasuanfa\.tmpresults\run_body_bracket_real_04_contract_v28`
+    - `I:\autoteklasuanfa\.tmpresults\run_body_bracket_real_04_contract_v29`
+    - `I:\autoteklasuanfa\.tmpresults\run_body_bracket_real_04_contract_v30`
+    - `I:\autoteklasuanfa\.tmpresults\run_body_bracket_real_04_contract_v31`
+    - `I:\autoteklasuanfa\.tmpresults\run_body_bracket_real_04_contract_v32`
+    - `I:\autoteklasuanfa\.tmpresults\run_body_bracket_real_04_contract_v33`
+    - `I:\autoteklasuanfa\.tmpresults\run_body_bracket_real_04_contract_v34`
+    - `I:\autoteklasuanfa\.tmpresults\run_body_bracket_real_04_contract_v35`
+    - `I:\autoteklasuanfa\.tmpresults\run_body_bracket_real_04_contract_v36`
+    - `I:\autoteklasuanfa\.tmpresults\run_body_bracket_real_04_contract_v37`
+
+### 阶段 6：定义驱动家族判定器
+
+- 状态：`主线已完成（23 个 deferred 直接人工复核）`
+
+- `2026-04-24` 已把阶段 6 的首版 `body-family-proof` sidecar 正式接入真实 full-run 主链：
+  - [BodyFamilyDefinitionEvaluator.cs](</I:/autoteklasuanfa/src/TeklaBodyBracketRecognition.App/BodyFamilyDefinitionEvaluator.cs>)
+  - [BodyFamilyProofModels.cs](</I:/autoteklasuanfa/src/TeklaBodyBracketRecognition.App/BodyFamilyProofModels.cs>)
+  - [BodyFamilyProofArtifactBuilder.cs](</I:/autoteklasuanfa/src/TeklaBodyBracketRecognition.App/BodyFamilyProofArtifactBuilder.cs>)
+  - [BodyFamilyProofWorkflow.cs](</I:/autoteklasuanfa/src/TeklaBodyBracketRecognition.App/BodyFamilyProofWorkflow.cs>)
+  - [Program.cs](</I:/autoteklasuanfa/src/TeklaBodyBracketRecognition.App/Program.cs>)
+  - [run_body_bracket_real_04_definition_clause_v79](/I:/autoteklasuanfa/.tmpresults/run_body_bracket_real_04_definition_clause_v79)
+  - [body-family-proof.json](/I:/autoteklasuanfa/.tmpresults/run_body_bracket_real_04_definition_clause_v79/body-family-proof.json)
+  - [body-family-proof.zh-CN.md](/I:/autoteklasuanfa/.tmpresults/run_body_bracket_real_04_definition_clause_v79/body-family-proof.zh-CN.md)
+- 当前 `v79` 已稳定导出：
+  - `205` 个 assembly
+  - `181` 个已进入阶段 6 家族判定
+  - `24` 个保守暂缓
+- 当前首版已明确吃到的家族是：
+  - `112 x STANDARD_SECTION`
+  - `36 x BOX`
+  - `25 x PRIMARY_PLATE_BODY`
+  - `8 x H`
+- 当前保守保留的 `24` 条 deferred 仍主要集中在：
+  - `22 x READINESS_NOT_PROMOTABLE`
+  - `2 x LEAD_CLAUSE_NOT_MAPPED`
+- 当前已明确这一步不是把所有 `ReadyForReview` / `ReviewRequired` 样本硬推成家族结论，而是先把已到 `ReadyForPromotion` 的稳定主桶正式接入阶段 6，并把剩余保守桶显式标记为 deferred。
+- `2026-04-24` 已按最新语义对阶段 6 首版做一轮窄收口：
+  - [BodyFamilyDefinitionEvaluator.cs](</I:/autoteklasuanfa/src/TeklaBodyBracketRecognition.App/BodyFamilyDefinitionEvaluator.cs>)
+  - [run_body_bracket_real_04_definition_clause_v80](/I:/autoteklasuanfa/.tmpresults/run_body_bracket_real_04_definition_clause_v80)
+  - [body-family-proof.json](/I:/autoteklasuanfa/.tmpresults/run_body_bracket_real_04_definition_clause_v80/body-family-proof.json)
+  - 当前已确认：
+    - `T3-2YPGL-3` 按“闭合箱壳类变截面”进入 `BOX / VARIABLE_SECTION_BOX`
+    - `T3-2MJ-11` 继续保守停在 `Deferred + LEAD_CLAUSE_NOT_MAPPED`，不自动并入阶段 6 家族结论
+  - `v80` 当前分布变为：
+    - `182` 个已进入阶段 6 家族判定
+    - `23` 个保守暂缓
+    - 其中 `VARIABLE_SECTION_BOX = 1`
+- 下一轮阶段 6 主问题继续收紧为：
+  - `MJ` 的 `CLUSTER_DIRECT_CONTROL_EXCLUSION_CLAUSE + ReadyForPromotion` 是否长期保持人工复核，还是未来需要独立 cluster family 映射
+  - `YPGL` 里除 `T3-2YPGL-3` 外，是否还存在其它应归入 `VARIABLE_SECTION_BOX` 的真实近邻样本
+  - 以及 `H_WEB_FLANGE_CONTINUITY_CLAUSE + Broken + ReadyForReview` 这批折型翼缘 `H` 是否继续保守停在 deferred，而不直接 promotion
+- `2026-04-24` 已明确阶段 6 对主线的收口口径：
+  - `182` 个已 adjudicated 样本直接作为阶段 7 自动细分输入
+  - `23` 个 deferred 直接旁路到人工复核，不再作为主线阻塞
+  - 因此阶段 6 当前按“主线完成，保留人工复核尾项”管理
+
+### 阶段 7：型材 / built-up 细分
+
+- 状态：`已完成`
+
+- `2026-04-24` 已把阶段 7 首版 `body-profile-resolution` sidecar 正式接入真实 full-run 主链：
+  - [BodyProfileResolver.cs](</I:/autoteklasuanfa/src/TeklaBodyBracketRecognition.App/BodyProfileResolver.cs>)
+  - [BodyProfileResolutionArtifactBuilder.cs](</I:/autoteklasuanfa/src/TeklaBodyBracketRecognition.App/BodyProfileResolutionArtifactBuilder.cs>)
+  - [BodyProfileResolutionWorkflow.cs](</I:/autoteklasuanfa/src/TeklaBodyBracketRecognition.App/BodyProfileResolutionWorkflow.cs>)
+  - [Program.cs](</I:/autoteklasuanfa/src/TeklaBodyBracketRecognition.App/Program.cs>)
+  - [run_body_bracket_real_04_definition_clause_v81](/I:/autoteklasuanfa/.tmpresults/run_body_bracket_real_04_definition_clause_v81)
+  - [body-profile-resolution.json](/I:/autoteklasuanfa/.tmpresults/run_body_bracket_real_04_definition_clause_v81/body-profile-resolution.json)
+  - [body-profile-resolution.zh-CN.md](/I:/autoteklasuanfa/.tmpresults/run_body_bracket_real_04_definition_clause_v81/body-profile-resolution.zh-CN.md)
+- 当前 `v81` 已稳定导出：
+  - `205` 个 assembly
+  - `182` 个已完成自动细分
+  - `23` 个人工复核旁路
+- 当前首版细分分布为：
+  - `112 x STANDARD_SECTION`
+  - `69 x REGULAR_BUILT_UP`
+  - `1 x VARIABLE_SECTION_BUILT_UP`
+  - `23 x MANUAL_REVIEW`
+- 当前这一步已经满足主线约束：
+  - 阶段 7 不再反向干扰阶段 6 家族定义
+  - 阶段 6 的 `23` 个 deferred 完整旁路，不混入自动细分
+- `2026-04-24` 已继续把阶段 7 的 built-up / 标准截面细分收紧到更稳定的 profile/series 结果，并完成真实 `v82 / v83` 验证：
+  - [BodyProfileResolver.cs](</I:/autoteklasuanfa/src/TeklaBodyBracketRecognition.App/BodyProfileResolver.cs>)
+  - [BodyProfileResolutionModels.cs](</I:/autoteklasuanfa/src/TeklaBodyBracketRecognition.App/BodyProfileResolutionModels.cs>)
+  - [BodyProfileResolutionArtifactBuilder.cs](</I:/autoteklasuanfa/src/TeklaBodyBracketRecognition.App/BodyProfileResolutionArtifactBuilder.cs>)
+  - [run_body_bracket_real_04_definition_clause_v82](/I:/autoteklasuanfa/.tmpresults/run_body_bracket_real_04_definition_clause_v82)
+  - [run_body_bracket_real_04_definition_clause_v83](/I:/autoteklasuanfa/.tmpresults/run_body_bracket_real_04_definition_clause_v83)
+  - [body-profile-resolution.zh-CN.md](/I:/autoteklasuanfa/.tmpresults/run_body_bracket_real_04_definition_clause_v83/body-profile-resolution.zh-CN.md)
+  - [body-profile-resolution.json](/I:/autoteklasuanfa/.tmpresults/run_body_bracket_real_04_definition_clause_v83/body-profile-resolution.json)
+  - [body-profile-resolution-validation.json](/I:/autoteklasuanfa/.tmpresults/run_body_bracket_real_04_definition_clause_v83/body-profile-resolution-validation.json)
+- 当前 `v82` 已把旧 `69 x REGULAR_BUILT_UP` 进一步拆成：
+  - `36 x BUILTUP_BOX`
+  - `25 x BUILTUP_PRIMARY_PLATE`
+  - `8 x BUILTUP_H`
+  - `1 x VARIABLE_SECTION_BUILT_UP`
+  - `23 x MANUAL_REVIEW`
+- 当前 `v83` 已在不改变总主桶分布的前提下，把 `STANDARD_SECTION` 进一步按系列落成：
+  - `75 x BH_SERIES`
+  - `34 x L_SERIES`
+  - `3 x D_SERIES`
+  - 同时保留：
+    - `36 x BOX_CLOSED_LOOP_SERIES`
+    - `25 x PRIMARY_PLATE_SERIES`
+    - `8 x H_FOLDED_FLANGE_SERIES`
+    - `1 x VARIABLE_SECTION_BOX_SERIES`
+    - `23 x MANUAL_REVIEW`
+- 当前 `v83` 验证结果：
+  - `AssemblyCount = 205`
+  - `ResolvedCount = 182`
+  - `ReviewBypassCount = 23`
+  - `IsValid = true`
+- 这说明阶段 7 当前已经形成两层稳定细分：
+  - 第一层：`ProfileCategory / Profile`
+  - 第二层：`ProfileSeries`
+- 当前 `STANDARD_SECTION` 真实主桶已经不再只是“标准型材”总类，而是可继续分辨为：
+  - `BH 焊接 H/I 系列`
+  - `角钢系列`
+  - `直径圆钢系列`
+- 当前已按主线收口口径确认：
+  - `BH_SERIES` 保持“系列级”即可，不再继续下钻到规格簇
+  - 最终阶段 7 输出要求以中文 Markdown/JSON 工件为准
+  - 阶段 7 不再继续扩张细分范围，后续转入阶段 8 的回归测试与切换准备
+
+### 阶段 8：回归测试与切换
+
+- 状态：`进行中`
+- `2026-04-24` 已按“先定大类，再定长度方向，再做细分”的新顺序，把长度方向类型正式接入真实主链，并完成真实 [run_body_bracket_real_06_definition_clause_v02](/I:/autoteklasuanfa/.tmpresults/run_body_bracket_real_06_definition_clause_v02) 回归：
+  - [Program.cs](</I:/autoteklasuanfa/src/TeklaBodyBracketRecognition.App/Program.cs>)
+  - [DefinitionClauseDecisionFullRunSourceCollector.cs](</I:/autoteklasuanfa/src/TeklaBodyBracketRecognition.App/DefinitionClauseDecisionFullRunSourceCollector.cs>)
+  - [BodyFamilyDefinitionEvaluator.cs](</I:/autoteklasuanfa/src/TeklaBodyBracketRecognition.App/BodyFamilyDefinitionEvaluator.cs>)
+  - [BodyProfileResolver.cs](</I:/autoteklasuanfa/src/TeklaBodyBracketRecognition.App/BodyProfileResolver.cs>)
+  - [Export-RecognitionExcels.py](</I:/autoteklasuanfa/tools/Export-RecognitionExcels.py>)
+  - 当前已新增显式字段：
+    - `LongitudinalTypeCode = STRAIGHT / ARC / POLYLINE`
+    - `LongitudinalTypeLabelZh = 直线主线 / 弧线主线 / 折线主线`
+  - 当前首版保守判定口径：
+    - `SourceMainPart / SourceBodySeed` 命中 `PolyBeam / BentPlate / IsSpecialShape` 时进入 `POLYLINE`
+    - 其余先进入 `STRAIGHT`
+    - `ARC` 先保留输出位，待 Tekla 侧补足可靠圆弧信号后再真正起用
+  - 当前 `real_06 / v02` 已确认新字段真实落进：
+    - `body-family-proof.json/.zh-CN.md/.xlsx`
+    - `body-profile-resolution.json/.zh-CN.md/.xlsx`
+  - 当前 `real_06 / v02` 长度方向分布：
+    - `279 x STRAIGHT`
+    - `98 x POLYLINE`
+    - `0 x ARC`
+  - 随后已继续复核真实：
+    - [run_body_bracket_real_01_definition_clause_v01](/I:/autoteklasuanfa/.tmpresults/run_body_bracket_real_01_definition_clause_v01)
+    - [run_body_bracket_real_04_definition_clause_v84](/I:/autoteklasuanfa/.tmpresults/run_body_bracket_real_04_definition_clause_v84)
+  - 当前三批真实样本已确认：
+    - `real_01 = 193 x STRAIGHT / 53 x POLYLINE / 0 x ARC`
+    - `real_04 = 173 x STRAIGHT / 32 x POLYLINE / 0 x ARC`
+    - `real_06 = 279 x STRAIGHT / 98 x POLYLINE / 0 x ARC`
+  - 当前还已单独抽看：
+    - [member_T2-3GL-179.json](/I:/xingcaisuanfa/cache/run_body_bracket_real_07/members/member_T2-3GL-179.json)
+    - [run_body_bracket_real_07_definition_clause_v01](/I:/autoteklasuanfa/.tmpresults/run_body_bracket_real_07_definition_clause_v01)
+  - 当前已确认 `T2-3GL-179`：
+    - 原始输入仅有 `1 x PolyBeam(RHS300*10)`
+    - 无 `Arc / Radius / Curv / 半径 / 圆弧` 显式字段
+    - 当前主链输出为：`POLYLINE / 折线主线`
+  - `2026-04-24` 已继续把 `STRAIGHT` 大类再细分为“普通直线”和“主轴折向直线”，并完成真实 [run_body_bracket_real_08_definition_clause_v02](/I:/autoteklasuanfa/.tmpresults/run_body_bracket_real_08_definition_clause_v02) 验证：
+    - [Program.cs](</I:/autoteklasuanfa/src/TeklaBodyBracketRecognition.App/Program.cs>)
+    - [DefinitionClauseDecisionFullRunSourceModels.cs](</I:/autoteklasuanfa/src/TeklaBodyBracketRecognition.App/DefinitionClauseDecisionFullRunSourceModels.cs>)
+    - [BodyFamilyProofModels.cs](</I:/autoteklasuanfa/src/TeklaBodyBracketRecognition.App/BodyFamilyProofModels.cs>)
+    - [BodyProfileResolutionModels.cs](</I:/autoteklasuanfa/src/TeklaBodyBracketRecognition.App/BodyProfileResolutionModels.cs>)
+    - [Export-RecognitionExcels.py](</I:/autoteklasuanfa/tools/Export-RecognitionExcels.py>)
+  - 当前已新增字段：
+    - `LongitudinalSubtypeCode`
+    - `LongitudinalSubtypeLabelZh`
+  - 当前首版已接入的小类：
+    - `GENERAL_STRAIGHT = 一般直线主线`
+    - `AXIAL_KINKED_STRAIGHT = 主轴折向直线`
+  - 当前 `AXIAL_KINKED_STRAIGHT` 的首版判定口径：
+    - 总长度方向仍属于 `STRAIGHT`
+    - `source body seed` 中存在与源主件同名的多段主柱件
+    - 且在不同高度层出现明确横向偏置
+  - 当前已确认 `T3-4GZ-5`：
+    - 当前主链输出为：`STRAIGHT / AXIAL_KINKED_STRAIGHT`
+    - 家族与型材结果保持：`BOX / CLOSED_LOOP_BOX -> BUILTUP_BOX`
+  - 这说明当前主线结论已经足够收口为：
+    - 现阶段真实数据里尚未发现可稳定起出 `ARC` 的样本
+    - 当前应先按 `STRAIGHT / POLYLINE` 两档推进长度方向大类语义
+    - 其中 `STRAIGHT` 已开始允许继续细分出 `主轴折向直线`
+    - `ARC` 继续保留为输出位，等待 TeklaExporter / 导入侧补到可靠圆弧信号后再启用
+- `2026-04-24` 已在真实 [run_body_bracket_real_05_definition_clause_v08](/I:/autoteklasuanfa/.tmpresults/run_body_bracket_real_05_definition_clause_v08) 把剩余 `deferred` 中已能站稳 `H` 大类、但子类仍待收紧的一批样本，从 `NONE` 家族口径改回 `H` 家族口径：
+  - [BodyFamilyDefinitionEvaluator.cs](</I:/autoteklasuanfa/src/TeklaBodyBracketRecognition.App/BodyFamilyDefinitionEvaluator.cs>)
+  - 当前这一步没有把所有样本都硬推成“已完成自动细分”，而是先在阶段 6 `Deferred` 行里保留稳定 `H` 家族与保守子类提示：
+    - `GENERAL_BUILTUP_H`
+    - `VARIABLE_SECTION_H`
+    - `IRREGULAR_H`
+    - `H_MAINLINE_BENT`
+  - 当前 `v08` 剩余 `29` 条 deferred 已统一不再显示：
+    - `未进入家族判定 / 无子类`
+  - 而是当前分布为：
+    - `19 x H / GENERAL_BUILTUP_H`
+    - `6 x H / VARIABLE_SECTION_H`
+    - `3 x H / IRREGULAR_H`
+    - `1 x H / H_MAINLINE_BENT`
+  - 其中已明确：
+    - `T2-12GL-75` 归入：`H / H_MAINLINE_BENT`
+    - `T2-12GL-17 / 20 / 77` 归入：`H / IRREGULAR_H`
+    - `T2-12GKL-2 / T2-12GL-10 / 11 / 12 / 13 / 15` 归入：`H / VARIABLE_SECTION_H`
+  - 当前已同步导出便于人工核对的 Excel：
+    - [body-family-proof.xlsx](/I:/autoteklasuanfa/.tmpresults/run_body_bracket_real_05_definition_clause_v08/body-family-proof.xlsx)
+    - [body-profile-resolution.xlsx](/I:/autoteklasuanfa/.tmpresults/run_body_bracket_real_05_definition_clause_v08/body-profile-resolution.xlsx)
+- `2026-04-24` 已在真实 [run_body_bracket_real_05_definition_clause_v07](/I:/autoteklasuanfa/.tmpresults/run_body_bracket_real_05_definition_clause_v07) 继续把一批“上游稳定是 H、阶段 5 已起出 H 条款但仍停在 deferred”的三板开口 `H` cohort 正式收回主线：
+  - [CoreBodyProofEngine.cs](</I:/autoteklasuanfa/src/TeklaBodyBracketRecognition.Core/Algorithms/CoreBodyProofEngine.cs>)
+  - [BodyFamilyDefinitionEvaluator.cs](</I:/autoteklasuanfa/src/TeklaBodyBracketRecognition.App/BodyFamilyDefinitionEvaluator.cs>)
+  - 当前阶段 5 已把这批 `2 x BodyCandidate + 1 x SpecialShape`、`纯开口`、`BodyWidthRetentionRatio` 落在约 `0.44~0.56 / 1.00` 的 `H` 变体统一起出：
+    - `H_WEB_FLANGE_CONTINUITY_CLAUSE`
+    - `Broken`
+    - `ReadyForReview`
+  - 当前阶段 6 已再补一条窄 family gate，仅针对：
+    - `SourceMemberMainClass = H`
+    - `BodyDescriptorFamily = BuiltUpT`
+    - `BodyDescriptorSectionType = BUILTUP_T`
+    - `LeadClause = H_WEB_FLANGE_CONTINUITY_CLAUSE`
+    - `BrokenCandidate + Break/Rewrite = 2/1`
+    - `ReadyForReview`
+  - 当前命中样本：
+    - `T2-12GKL-5 / 6 / 7 / 10 / 11 / 12 / 16`
+    - `T2-12GL-26 / 27 / 30 / 31 / 33 / 39`
+  - 当前这 `13` 个样本在 `v07` 已统一进入：
+    - 阶段 6：`H / GENERAL_BUILTUP_H`
+    - 阶段 7：`BUILTUP_H / H_BUILTUP_SERIES`
+  - 当前 `v07` 验证结果：
+    - `AssemblyCount = 119`
+    - `AdjudicatedCount = 90`
+    - `DeferredCount = 29`
+    - `ResolvedCount = 90`
+  - 当前已同步导出便于人工核对的 Excel：
+    - [body-family-proof.xlsx](/I:/autoteklasuanfa/.tmpresults/run_body_bracket_real_05_definition_clause_v07/body-family-proof.xlsx)
+    - [body-profile-resolution.xlsx](/I:/autoteklasuanfa/.tmpresults/run_body_bracket_real_05_definition_clause_v07/body-profile-resolution.xlsx)
+- `2026-04-24` 已在真实 [run_body_bracket_real_05_definition_clause_v05](/I:/autoteklasuanfa/.tmpresults/run_body_bracket_real_05_definition_clause_v05) 回归中补上“稳定 H 主类优先于单主板 fallback”的阶段 6 纠偏：
+  - [DefinitionClauseDecisionFullRunSourceCollector.cs](</I:/autoteklasuanfa/src/TeklaBodyBracketRecognition.App/DefinitionClauseDecisionFullRunSourceCollector.cs>)
+  - [DefinitionClauseDecisionFullRunSourceModels.cs](</I:/autoteklasuanfa/src/TeklaBodyBracketRecognition.App/DefinitionClauseDecisionFullRunSourceModels.cs>)
+  - [BodyFamilyDefinitionEvaluator.cs](</I:/autoteklasuanfa/src/TeklaBodyBracketRecognition.App/BodyFamilyDefinitionEvaluator.cs>)
+  - [BodyProfileResolver.cs](</I:/autoteklasuanfa/src/TeklaBodyBracketRecognition.App/BodyProfileResolver.cs>)
+  - 当前已把一批原先误落到 `PRIMARY_PLATE_BODY / MAJORITY_CONTINUITY` 的稳定 `H` 主类样本重新收回：
+    - `T2-12GKL-1 / 3 / 4`
+    - `T2-12GL-23 / 24`
+  - 当前这批样本在 `v05` 已统一进入：
+    - 阶段 6：`H / GENERAL_BUILTUP_H`
+    - 阶段 7：`BUILTUP_H / H_BUILTUP_SERIES`
+  - 当前 `v05` 验证结果：
+    - `AssemblyCount = 119`
+    - `AdjudicatedCount = 77`
+    - `IsValid = true`
+  - 当前已同步导出便于人工核对的 Excel：
+    - [body-family-proof.xlsx](/I:/autoteklasuanfa/.tmpresults/run_body_bracket_real_05_definition_clause_v05/body-family-proof.xlsx)
+    - [body-profile-resolution.xlsx](/I:/autoteklasuanfa/.tmpresults/run_body_bracket_real_05_definition_clause_v05/body-profile-resolution.xlsx)
+- 当前下一步：
+    - 以 `Run-OfflineRecognition.ps1` 为统一入口继续跑真实样本回归
+    - 在已稳定的大类上，优先把“长度方向类型”真正纳入后续子类判定 gate，而不是只停留在展示字段
+    - 当前长度方向主线先按 `STRAIGHT / POLYLINE` 两档推进；`ARC` 暂不再反复试跑，除非上游补到可靠圆弧信号
+    - 优先继续把 `real_05 / v08` 里已回到 `H` 大类的 `29` 个样本，继续从：
+    - `GENERAL_BUILTUP_H`
+    - `VARIABLE_SECTION_H`
+    - `IRREGULAR_H`
+    - `H_MAINLINE_BENT`
+    这些保守子类，进一步收紧到更稳定的阶段 6/7 细分结果
+  - 最终面向人工查看的结果以中文文件为准：
+    - `body-family-proof.zh-CN.md`
+    - `body-profile-resolution.zh-CN.md`
+    - 以及批次级中文摘要 `topology-rewrite-summary.zh-CN.md`
+  - JSON 工件继续保留作程序侧校验与二次加工：
+    - `body-family-proof.json`
+    - `body-profile-resolution.json`
+    - `*-validation.json`
+
+## 最近增量
+
+- `2026-04-24` 已在 [run_body_bracket_real_04_definition_clause_v78](/I:/autoteklasuanfa/.tmpresults/run_body_bracket_real_04_definition_clause_v78) 把 `GL-5 / 10 / 50 / 51 / 52 / 55 / 56 / 57` 这一批 `SatisfiedCandidate + Break/Rewrite=1/2` 的折板 `H` 从 review 桶正式收掉：
+  - [DefinitionClauseDecisionFullRunSourceCollector.cs](</I:/autoteklasuanfa/src/TeklaBodyBracketRecognition.App/DefinitionClauseDecisionFullRunSourceCollector.cs>) 已新增更窄的 assembly gate：
+    - 仅允许：
+      - `BodyDescriptorFamily = BuiltUpT`
+      - `MemberId` 落在普通 `GL` 桶，不外推到 `GKL`
+      - `LeadClause = H_WEB_FLANGE_CONTINUITY_CLAUSE`
+      - `LeadClauseEffectDirection = SatisfiedCandidate`
+      - `Break/Rewrite = 1/2`
+      - `SINGLE_CLAUSE + Share = 100%`
+      - 当前 assembly 仍停在 `ReviewRequired + ReadyForReview`
+    - 当前命中后统一落成：
+      - `Satisfied`
+      - `ReadyForPromotion`
+  - 当前 `v78` 真实结果：
+    - `T3-2GL-5 / 10 / 50 / 51 / 52 / 55 / 56 / 57`
+    - 已统一从：
+      - `ReviewRequired + ReadyForReview`
+    - 收紧到：
+      - `Satisfied + ReadyForPromotion`
+  - 当前同时确认 keep-out 仍保持不变：
+    - `T3-2GKL-3` 继续停在：
+      - `ReviewRequired + ReadyForReview`
+    - `T3-2GL-9` 继续停在：
+      - `ReviewRequired + ReadyForReview`
+  - 这说明当前折板 `H` 已在 assembly gate 上形成两档稳定分流：
+    - `Break/Rewrite = 2/1` -> `Broken + ReadyForReview`
+    - `Break/Rewrite = 1/2` 且普通 `GL / BuiltUpT` -> `Satisfied + ReadyForPromotion`
+- `2026-04-24` 已在 [run_body_bracket_real_04_definition_clause_v77](/I:/autoteklasuanfa/.tmpresults/run_body_bracket_real_04_definition_clause_v77) 把 `SourceStandardSection` 直达链从“单 core part”收紧成“source semantic 优先，但保留保守 keep-out”的真实入口：
+  - [DefinitionClauseDecisionFullRunSourceCollector.cs](</I:/autoteklasuanfa/src/TeklaBodyBracketRecognition.App/DefinitionClauseDecisionFullRunSourceCollector.cs>) 已对 `ResolveSourceStandardSectionDirectProfile(...)` 做三层收紧：
+    - 允许 `proof-side` 没有起出 `CoreBodyPart`、甚至 `Result.Parts = 0` 时，仍按 `source main profile` 直达；
+    - 允许 synthesized `STANDARD_IH` 的 `2 x core plate / 0 review` 样本继续按 `source semantic` 直达；
+    - `STANDARD_ROD` 允许“主杆件 + 附属模板/锚杆”按 source 主杆件直达，但显式排除 `ImportSynthesisKind = BOX` 的 `MJ-2`；
+  - 同时 assembly 聚合层已改成：
+    - 只要命中这条 `SourceStandardSection` 直达，就由 source semantic 直接落成：
+      - `STANDARD_SECTION_SOURCE_IDENTITY_CLAUSE`
+      - `Satisfied`
+      - `ReadyForPromotion`
+    - 不再让 `LostEnvelopeSupport / LostBodyCoverage` 这类 synthetic proof-side 信号反压 source semantic；
+  - 当前 `v77` 真实新增结果：
+    - `T3-2GL-1 / 16 / 21 / 24 / 37 / 59 / 67 / 69 / 75 / 87 / 96 / 98`
+    - `T3-2GKL-2`
+    - `T3-1HMS-1 / 2 / 3`
+    - `T3-2YC-1..13`
+    - 已统一达到：
+      - `STANDARD_SECTION_SOURCE_IDENTITY_CLAUSE`
+      - `Satisfied + ReadyForPromotion`
+  - 当前同时确认保守 keep-out 仍保持不变：
+    - `T3-2GL-66 / 70 / 76 / 103`
+    - `T3-2MJ-2 / 10 / 12`
+  - 当前 `v77` fresh 剩余主桶已收紧为：
+    - `BuiltUpT` review 桶：`T3-2GKL-3 / T3-2GL-5 / 10 / 50 / 51 / 52 / 55 / 56 / 57`
+    - `STANDARD_IH` 保守桶：`T3-2GKL-6 / T3-2GL-66 / 70 / 71 / 76 / 103`
+    - `STANDARD_ROD` review 桶：`T3-2MJ-2 / 10 / 12`
+- `2026-04-24` 已在 [run_body_bracket_real_04_definition_clause_v73](/I:/autoteklasuanfa/.tmpresults/run_body_bracket_real_04_definition_clause_v73) 继续把 `T3-2GL-11 / 17 / 46` 接回折板 `H` 主链：
+  - [CoreBodyProofEngine.cs](</I:/autoteklasuanfa/src/TeklaBodyBracketRecognition.Core/Algorithms/CoreBodyProofEngine.cs>) 的 `ResolveBentFlangeHPartIds(...)` 已对折板 `H` 入口再放宽半档，但仍保持窄规则：
+    - 新增 `纯开口 + 对称双主体板` 小类：
+      - `2 x BodyCandidate` 的 `BodyWidthRetentionRatio` 允许落在 `0.45~0.55`
+      - `SpecialShape` review 翼缘即便也承担 envelope support，仍可并入折板 `H`
+    - 新增 `弱单站位闭环 + review 翼缘不承担 envelope support` 小类：
+      - 对应 `GL-46` 这类与 `GL-47 / 48` 同语义、但 review 翼缘 envelope 支撑更弱的变体
+  - 当前 `v73` 真实结果：
+    - `T3-2GL-11 / 17 / 46`
+    - 已统一从：
+      - `NO_CLAUSE_ROWS`
+      - `InsufficientEvidence / ReviewRequired`
+    - 收紧到：
+      - `H_WEB_FLANGE_CONTINUITY_CLAUSE`
+      - `Broken + ReadyForReview`
+      - `Break/Rewrite = 2/1`
+  - 当前同时确认未被误带动的保守样本仍保持不变：
+    - `T3-2GL-66 / 70 / 103 / 76`
+  - 这说明当前折板 `H` 规则此前确实偏严一档，但本轮放宽仍停留在：
+    - 明确的折板 `H` 变体
+    - 未向保守 `StandardSection IH` 样本外推
+- `2026-04-24` 已在 [run_body_bracket_real_04_definition_clause_v71](/I:/autoteklasuanfa/.tmpresults/run_body_bracket_real_04_definition_clause_v71) 补上 `StandardSection / STANDARD_BOX` 单件直达链，并把剩余 `13` 个 `YPGL` 全部从 `NO_CLAUSE_ROWS + ReviewRequired` 收掉：
+  - [DefinitionClauseDecisionFullRunSourceCollector.cs](</I:/autoteklasuanfa/src/TeklaBodyBracketRecognition.App/DefinitionClauseDecisionFullRunSourceCollector.cs>) 已新增更窄的 `source-semantic BOX` 直达规则：
+    - 只允许：
+      - `SourceSemanticBodyFamily = StandardSection`
+      - `SourceSemanticSectionType = STANDARD_BOX`
+      - `SynthesizedBody = true`
+      - `ImportSynthesisKind = BOX`
+      - `core-body-proof` 仅有 `1` 个 `CoreBodyPart`
+      - `0` 个 `ReviewPart`
+      - 当前仍停在 `NO_CLAUSE_ROWS`
+    - 当前直达落点为：
+      - `LeadClause = BOX_CLOSED_LOOP_OPPOSITE_WALL_CLAUSE`
+      - `ClauseMix = SINGLE_CLAUSE`
+      - `ClauseVerdict = Satisfied`
+      - `ClausePromotionReadiness = ReadyForPromotion`
+  - 当前 `v71` 真实结果：
+    - `T3-2YPGL-1 / 2 / 4 / 7 / 10 / 13 / 14 / 16 / 19 / 20 / 22 / 24 / 25`
+    - 已统一从：
+      - `LeadClauseCode = ""`
+      - `ClauseMix = NO_CLAUSE_ROWS`
+      - `ReviewRequired + ReadyForReview`
+    - 收紧到：
+      - `BOX_CLOSED_LOOP_OPPOSITE_WALL_CLAUSE`
+      - `Satisfied + ReadyForPromotion`
+  - 这说明当前这批样本的问题并不是：
+    - 主材家族没认出来
+  - 而是之前阶段 5/6 缺了一条：
+    - `source-standard BOX` 单件直达语义链
+  - 当前这条缺口已补齐，后续主线可以从 `YPGL` 大盘转回：
+    - 普通 `GL`
+    - `MJ`
+- `2026-04-24` 已在 [run_body_bracket_real_04_definition_clause_v70](/I:/autoteklasuanfa/.tmpresults/run_body_bracket_real_04_definition_clause_v70) 把 `T3-2GL-31` 从“开口 H 变体但 proof-chain 起不来”接回折板 `H` 主链：
+  - [CoreBodyProofEngine.cs](</I:/autoteklasuanfa/src/TeklaBodyBracketRecognition.Core/Algorithms/CoreBodyProofEngine.cs>) 的 `ResolveBentFlangeHPartIds(...)` 已新增更窄的开口 `H` review-翼缘变体入口：
+    - 仍只允许：
+      - `2 x BodyCandidate + 1 x SpecialShape`
+      - `PriorityStationPresenceRatio >= 0.95`
+      - 全 cohort 保持开口、`ClosedLoopStationCountBefore/AfterRemoval = 0`
+    - 新放宽仅针对：
+      - `2` 个主体件稳定承担 envelope support
+      - `SpecialShape` review 件不承担 envelope support
+      - 但该 review 件在移除后仍保持 `BodyCoverage / EnvelopeBodyCoverage`
+      - 且 `BodyWidthRetentionRatio >= 0.95`
+    - 当前这条语义已按用户补充收紧成：
+      - `折板 / 拼接翼缘 H 变体`
+      - 不要求“下翼缘必须是一整块板”
+  - 当前 `v70` 真实验证结果：
+    - `T3-2GL-31` 已从：
+      - `ProofType = NONE`
+      - `FamilyProofTarget = NONE`
+      - `DefinitionClause = NONE`
+    - 收紧到：
+      - `H_MAIN_CONTOUR_PROOF`
+      - `H_WEB_FLANGE_PROOF_TARGET`
+      - `H_WEB_FLANGE_CONTINUITY_CLAUSE`
+    - cohort 已稳定表现为：
+      - `29727047 / 29727081` -> `H_WEB_FLANGE_CONTINUITY_BREAK_EFFECT`
+      - `29793369` -> `H_WEB_FLANGE_CONTINUITY_REWRITE_EFFECT`
+  - 这说明 `GL-31` 的正确语义不是 `BOX`、也不是“必须单块翼缘板”的特例，而是：
+    - 开口 `H` 主轮廓稳定
+    - 折板/拼接翼缘作为 review 变体件并入 `H` 主链
+- `2026-04-24` 已在 [run_body_bracket_real_04_definition_clause_v69](/I:/autoteklasuanfa/.tmpresults/run_body_bracket_real_04_definition_clause_v69) 把“source standard section 优先”从 summary 继续接进阶段 5/6 的 full-run source 家族 lane：
+  - [DefinitionClauseDecisionFullRunSourceModels.cs](</I:/autoteklasuanfa/src/TeklaBodyBracketRecognition.App/DefinitionClauseDecisionFullRunSourceModels.cs>) 已新增显式字段：
+    - `SourceSemanticBodyFamily`
+    - `SourceSemanticSectionType`
+    - `SourceSemanticPriorityApplied`
+  - [DefinitionClauseDecisionFullRunSourceCollector.cs](</I:/autoteklasuanfa/src/TeklaBodyBracketRecognition.App/DefinitionClauseDecisionFullRunSourceCollector.cs>) 已把 `SourceMainPartProfileString` 的标准截面语义直接接入 assembly / representative-part source：
+    - 不再只能通过 `BodyDescriptorFamily` 间接猜测
+    - 现在 full-run source 工件会显式告诉下游：
+      - 源主件是否被 `StandardSection` 语义优先接管
+      - 当前优先命中的标准截面子类是什么
+  - 当前 `v69` 真实验证结果：
+    - assembly lane 已显式出现：
+      - `T3-2DZ-19 -> SourceSemanticBodyFamily = StandardSection / STANDARD_IH / PriorityApplied = true`
+      - `T3-2GL-1 -> SourceSemanticBodyFamily = StandardSection / STANDARD_IH / PriorityApplied = true`
+      - `T3-2YPGL-1 -> SourceSemanticBodyFamily = StandardSection / STANDARD_BOX / PriorityApplied = true`
+    - representative-part lane 也已同步带出这三列
+    - 当前 `v69` full-run source 里 `SourceSemanticPriorityApplied = true` 的 assembly 已覆盖：
+      - `84` 个 `STANDARD_IH`
+      - `34` 个 `STANDARD_ANGLE`
+      - `13` 个 `STANDARD_BOX`
+      - `7` 个 `STANDARD_ROD`
+  - 这说明当前阶段 5/6 工件已经不再只是“看起来像标准截面”，而是显式保存了：
+    - source-side 家族真语义
+    - 与 proof-side synthetic 表示并存的双轨信息
+- `2026-04-24` 已在 [run_body_bracket_real_04_definition_clause_v68](/I:/autoteklasuanfa/.tmpresults/run_body_bracket_real_04_definition_clause_v68) 把一大批“源主件本来就是 `BH / BOX` 标准型材、但导入阶段先被合成为板链”的样本，从 summary 家族口径上收回到 `StandardSection`：
+  - [Program.cs](</I:/autoteklasuanfa/src/TeklaBodyBracketRecognition.App/Program.cs>) 已新增“源主件标准截面优先” summary 覆盖：
+    - `body-main-material-summary / explanation` 不再直接把 `ImportSynthesisKind = H / BOX` 当成家族结论
+    - 只要 `SourceMainPartProfileString` 本身已是明确标准截面字符串，就优先落：
+      - `BodyDescriptorFamily = StandardSection`
+      - 对应的 `STANDARD_IH / STANDARD_BOX / ...`
+    - 同时保留：
+      - recognition/proof 侧的 synthetic `H / BOX` plate-chain
+      - 阶段 5 仍可继续借 synthetic 板链跑 proof-engine
+  - 当前 `v68` 真实验证结果：
+    - synthesized `BH / BOX` cohort 已分化成：
+      - `80` 个 `StandardSection / STANDARD_IH`
+      - `13` 个 `StandardSection / STANDARD_BOX`
+    - 代表样本：
+      - `T3-2DZ-19 / T3-2GL-1 / T3-2GL-36 / T3-2HXL-1`
+      - `T3-2YPGL-1 / T3-2YPGL-4`
+    - 当前都已达到：
+      - `BodyDescriptorDerivationType = StandardProfile`
+      - `BodyDescriptorReviewRequired = false`
+  - 这说明当前这批样本的正确语义应是：
+    - 家族先判 `StandardSection`
+    - synthetic `H / BOX` 仅作为 proof 表示
+    - 不应再先掉入 `BuiltUpH / BuiltUpBox` 再回头纠偏
+  - 当前仍保留在非标准截面口径的边界样本，主要已收缩到：
+    - 多 seed / variant 的少数 `GL-H` 变体
+    - 以及 `HMS / MJ / MQMJ / YPGL` 里本来就不是“单件标准型材”的真实异形/埋件样本
+- `2026-04-24` 已在 [run_body_bracket_real_04_definition_clause_v67](/I:/autoteklasuanfa/.tmpresults/run_body_bracket_real_04_definition_clause_v67) 把 `YC` 这批单零件角钢从 `Unknown` 拉回“单主件标准截面”主线：
+  - [BodyRecognizer.cs](</I:/autoteklasuanfa/src/TeklaBodyBracketRecognition.Core/Algorithms/BodyRecognizer.cs>) 已把单主件 `StandardSection` fast path 再收紧一轮：
+    - 不再把 `IsSpecialShape = true` 的单件 `PolyBeam` 直接挡掉
+    - 只要 assembly 里仍是：
+      - `1` 个非 tiny 主件
+      - `MainPartId` 与该主件一致
+      - `RuntimeType = Beam / PolyBeam`
+      - `ProfileString` 本身就是标准截面字符串
+    - 就直接走：
+      - `BodyType = ProfileBody`
+      - `BodyFamily = StandardSection`
+      - `MatchType = StandardProfile`
+  - 当前标准截面 profile 前缀已从先前的角钢小口径继续扩到更一般的入口：
+    - `L / C / U / [ / H / I / BH / T / BOX / BK / RHS / SHS / PIPE / CHS / ROD / Dxx`
+  - 当前 `v67` 真实验证结果：
+    - `T3-2YC-1 / 2 / 3 / 4 / 5 / 6 / 7 / 8 / 9 / 10 / 11 / 12 / 13`
+    - 已统一从：
+      - `BodyDescriptorFamily = Unknown`
+      - `BodyDescriptorSectionType = Unknown`
+      - `BodyDescriptorReviewRequired = true`
+    - 收紧到：
+      - `BodyDescriptorFamily = StandardSection`
+      - `BodyDescriptorSectionType = STANDARD_ANGLE`
+      - `BodyDescriptorDerivationType = StandardProfile`
+      - `BodyDescriptorReviewRequired = false`
+  - 当前这说明：
+    - `L80*6 / L100*8 / L125*8` 这类单零件角钢不应再停在 `Unknown`
+    - “标准截面”入口不能只覆盖普通 `Beam`，也必须覆盖单件 `PolyBeam`
+  - 当前剩余边界也已更清楚：
+    - `BH / BOX` 大盘多数仍在导入阶段先被合成为虚拟板链，所以不会被这条 `BodyRecognizer` fast path 直接命中
+    - `v67` 里剩余仍像“单件标准截面却没进 StandardSection”的 unsynthesized 样本，已主要收缩到：
+      - `T3-2GL-66 / 70 / 103 / 76`（`BH400*150*8*8 / BH400*200*8*10`）
+      - `T3-1HMS-1 / 2 / 3`（`D24`）
+- `2026-04-24` 已在 [run_body_bracket_real_04_definition_clause_v65](/I:/autoteklasuanfa/.tmpresults/run_body_bracket_real_04_definition_clause_v65) 把 `GL` 大盘里一批被误落成 `Irregular` 的单零件标准截面重新拉回标准型材直通入口：
+  - [BodyRecognizer.cs](</I:/autoteklasuanfa/src/TeklaBodyBracketRecognition.Core/Algorithms/BodyRecognizer.cs>) 已新增“单主件标准截面” fast path：
+    - 不再只围绕 built-up 板件 chain 投票
+    - 当 assembly 只有 `1` 个主体件，且：
+      - `RuntimeType = Beam / PolyBeam`
+      - `ProfileString` 非 `PL*`
+      - 主截面字符串本身已是标准型材
+    - 直接输出：
+      - `BodyType = ProfileBody`
+      - `BodyFamily = StandardSection`
+      - `MatchType = StandardProfile`
+  - 当前已按更上位的“标准截面”入口接线，而不是只特判 `L` 角钢：
+    - `L / C / U / H / I / T / BOX / PIPE / ROD`
+    - 当前这批真实命中样本先落成：
+      - `STANDARD_ANGLE`
+  - 当前 `v65` 真实验证结果：
+    - `T3-2GL-13 / 14 / 77 / 78 / 79 / 80 / 81 / 82 / 83 / 84 / 85 / 86 / 88 / 89 / 90 / 91 / 92 / 93 / 94 / 95`
+    - 已统一从：
+      - `Irregular`
+      - `Irregular`
+      - `Irregular`
+      - `ReviewRequired = true`
+    - 收紧到：
+      - `BodyDescriptorFamily = StandardSection`
+      - `BodyDescriptorSectionType = STANDARD_ANGLE`
+      - `BodyDescriptorDerivationType = StandardProfile`
+      - `BodyDescriptorReviewRequired = false`
+  - 这说明当前这批单零件 `L75*5` 构件不应继续走：
+    - built-up proof-chain
+    - `Irregular` 兜底桶
+  - 而应明确归入：
+    - 单零件标准截面
+    - 当前子类为 `STANDARD_ANGLE`
+- `2026-04-24` 已在 [run_body_bracket_real_04_definition_clause_v63](/I:/autoteklasuanfa/.tmpresults/run_body_bracket_real_04_definition_clause_v63) 把 `T3-2GL-12 / 47 / 48` 接进“单站位弱闭环痕迹”的折板翼缘 `H` 小类：
+  - [CoreBodyProofEngine.cs](</I:/autoteklasuanfa/src/TeklaBodyBracketRecognition.Core/Algorithms/CoreBodyProofEngine.cs>) 已把折板翼缘 `H` fallback 拆成两档：
+    - 原有的“纯开口 H”更严门槛
+    - 新增“单站位弱闭环痕迹”的窄 `H` 小类：
+      - cohort 仍为 `2 x BodyCandidate + 1 x SpecialShape`
+      - 允许最多 `1` 个站位出现局部闭环痕迹
+      - `2` 个主体平板删除后闭环痕迹消失
+      - 折板件可保留局部闭环像，但不据此改判成 `BOX`
+  - [DefinitionClauseDecisionFullRunSourceCollector.cs](</I:/autoteklasuanfa/src/TeklaBodyBracketRecognition.App/DefinitionClauseDecisionFullRunSourceCollector.cs>) 已把这类 `H_WEB_FLANGE_CONTINUITY_CLAUSE` 的 `B2/R1` assembly readiness 收紧回保守口径：
+    - `Broken`
+    - `ReadyForReview`
+  - 当前 `v63` 真实验证结果：
+    - `T3-2GL-12 / 47 / 48`
+    - 已统一达到：
+      - `LeadClauseCode = H_WEB_FLANGE_CONTINUITY_CLAUSE`
+      - `LeadClauseEffectDirectionCode = BrokenCandidate`
+      - `LeadClauseBreakEffectCount = 2`
+      - `LeadClauseRewriteEffectCount = 1`
+      - `LeadClauseVerdictCode = Broken`
+      - `LeadClausePromotionReadinessCode = ReadyForReview`
+  - 这说明当前这三件不应再停在：
+    - `BuiltUpT`
+    - `NO_CLAUSE_ROWS`
+    - `ReviewRequired`
+  - 而应明确归入：
+    - `折板翼缘 H` 小类
+    - `H_WEB_FLANGE_CONTINUITY_CLAUSE`
+    - `条款破坏，但仍需定义复核`
+- `2026-04-24` 已在 [run_body_bracket_real_04_definition_clause_v61](/I:/autoteklasuanfa/.tmpresults/run_body_bracket_real_04_definition_clause_v61) 把 `YPGL` 的“四壁闭合箱壳”小类重新接回 `BOX` 主链：
+  - [CoreBodyProofEngine.cs](</I:/autoteklasuanfa/src/TeklaBodyBracketRecognition.Core/Algorithms/CoreBodyProofEngine.cs>) 已把闭合箱壳 fallback 从“逐件都要有 envelope support”收紧成“cohort 级闭合箱壳”：
+    - 仍保留原来的：
+      - canonical `BOX` 壳件
+      - `闭合箱壳 + 折板翼缘` 小类
+    - 新增窄小类：
+      - `4` 块板全部稳定 `LostClosedLoop`
+      - 其中 `2` 块承担 envelope support
+      - 另 `2` 块虽不承担 envelope support，但仍属于同一闭合箱壳 cohort
+  - 当前这条窄规则已只命中：
+    - `T3-2YPGL-12 / 17 / 23`
+  - 当前 `v61` 真实验证结果：
+    - `T3-2YPGL-12 / 17 / 23 / 5`
+    - 已统一达到：
+      - `LeadClauseCode = BOX_CLOSED_LOOP_OPPOSITE_WALL_CLAUSE`
+      - `LeadClauseShare = 100%`
+      - `LeadClauseEffectCode = BOX_CLOSED_LOOP_DIRECT_BREAK_EFFECT`
+      - `LeadClauseBreakEffectCount = 4`
+      - `LeadClauseVerdictCode = Broken`
+      - `LeadClausePromotionReadinessCode = ReadyForPromotion`
+  - 这说明当前 `YPGL` 里至少已有一批稳定子类不应继续停在泛化的 `ReviewRequired`，而应明确归入：
+    - `闭合箱壳 BOX` 小类
+    - `条款破坏`
+    - `可进入阶段 6 提升`
+  - 下一轮主问题继续收紧为：
+    - 是否还存在其它 `YPGL` 闭合箱壳 cohort 只是被当前窄规则漏掉
+    - 以及普通 `GL / BuiltUpT / Irregular` 剩余 `NO_CLAUSE_ROWS + ReviewRequired` 大盘里，哪些值得继续补 proof-chain upstream
+- `2026-04-23` 已把 `H` 折型翼缘 assembly 的 `BrokenCandidate + StableFull + B2/R1 -> Broken + ReadyForReview` 窄 gate 正式冻结进定义文档：
+  - [DEFINITION_CLAUSE_DECISION_VERDICT_GATE.zh-CN.md](</I:/autoteklasuanfa/DEFINITION_CLAUSE_DECISION_VERDICT_GATE.zh-CN.md>)
+  - [DEFINITION_CLAUSE_DECISION_EXPECTED_CASES.zh-CN.md](</I:/autoteklasuanfa/DEFINITION_CLAUSE_DECISION_EXPECTED_CASES.zh-CN.md>)
+  - 当前已明确：
+    - 这条规则是 `GL` 大类里的 `GL-H` 折型翼缘子类例外
+    - 不等于把普通 `GL` 从保守 `ReviewRequired / Mixed` 整体放宽成 `Broken`
+    - 当前 `BROKEN` 仍只来自 assembly 聚合 narrow gate，而不是回退到旧启发式或外形直觉
+  - 当前预期样本已同步收紧为：
+    - 普通 `GL` 仍保守停在 `REVIEW_REQUIRED / HOLD_EFFECT_ONLY`
+    - `GL-H` 折型翼缘子类允许稳定落在：
+      - `BROKEN`
+      - `READY_FOR_REVIEW`
+- `2026-04-23` 已在 [run_body_bracket_real_04_definition_clause_v60](/I:/autoteklasuanfa/.tmpresults/run_body_bracket_real_04_definition_clause_v60) 把 `BrokenCandidate + StableFull + B2/R1` 的 `H` 折型翼缘 assembly 组合正式接进 verdict gate：
+  - [DefinitionClauseDecisionFullRunSourceCollector.cs](</I:/autoteklasuanfa/src/TeklaBodyBracketRecognition.App/DefinitionClauseDecisionFullRunSourceCollector.cs>) 已新增窄 assembly override：
+    - 仅针对：
+      - `LeadClauseCode = H_WEB_FLANGE_CONTINUITY_CLAUSE`
+      - `LeadClauseShare = 100%`
+      - `ClauseMix = SINGLE_CLAUSE`
+      - `LeadClauseEffectDirectionCode = BrokenCandidate`
+      - `LeadClauseBreakEffectCount = 2`
+      - `LeadClauseRewriteEffectCount = 1`
+    - 且当前 assembly 仍停在：
+      - `LeadClauseVerdictCode = ReviewRequired`
+      - `LeadClausePromotionReadinessCode = ReadyForReview`
+    - 才会把 assembly verdict 收紧为：
+      - `LeadClauseVerdictCode = Broken`
+      - `ClauseVerdicts = 条款破坏`
+    - readiness 仍保守保持：
+      - `LeadClausePromotionReadinessCode = ReadyForReview`
+  - 当前 `v60` 真实验证结果：
+    - `T3-2GL-5 / 9 / 10 / 49 / 50 / 51 / 52 / 53 / 54 / 55 / 56 / 57`
+    - 以及 `T3-2GKL-3`
+    - 已统一达到：
+      - `LeadClauseEffectDirectionCode = BrokenCandidate`
+      - `LeadClauseBreakEffectCount = 2`
+      - `LeadClauseRewriteEffectCount = 1`
+      - `LeadClauseVerdictCode = Broken`
+      - `LeadClausePromotionReadinessCode = ReadyForReview`
+  - 这说明当前这批 `H_WEB_FLANGE_CONTINUITY_CLAUSE` 样本已经不再只是“更像条款破坏候选”，而是正式进入：
+    - `条款破坏`
+    - 但仍要求定义复核，不直接进入阶段 6 promotion
+  - 下一轮主问题继续收紧为：
+    - 这条 `H` assembly narrow gate 是否需要补 fixture / 文档级冻结
+    - 以及其它 `GL / H` effect 组合是否也存在可安全进入 verdict gate 的同类窄模式
+- `2026-04-23` 已在 [run_body_bracket_real_04_definition_clause_v59](/I:/autoteklasuanfa/.tmpresults/run_body_bracket_real_04_definition_clause_v59) 把 `DefinitionClauseEffect` 的 assembly 聚合再收紧一层，正式导出 `effect direction`：
+  - [DefinitionClauseDecisionFullRunSourceCollector.cs](</I:/autoteklasuanfa/src/TeklaBodyBracketRecognition.App/DefinitionClauseDecisionFullRunSourceCollector.cs>)
+  - [DefinitionClauseDecisionFullRunSourceModels.cs](</I:/autoteklasuanfa/src/TeklaBodyBracketRecognition.App/DefinitionClauseDecisionFullRunSourceModels.cs>)
+  - [DefinitionClauseDecisionFullRunSourceArtifactBuilder.cs](</I:/autoteklasuanfa/src/TeklaBodyBracketRecognition.App/DefinitionClauseDecisionFullRunSourceArtifactBuilder.cs>)
+  - [DefinitionClauseDecisionFullRunSourceArtifactModels.cs](</I:/autoteklasuanfa/src/TeklaBodyBracketRecognition.App/DefinitionClauseDecisionFullRunSourceArtifactModels.cs>)
+  - 当前 assembly 已新增：
+    - `LeadClauseEffectDirectionCode / LabelZh`
+    - Markdown 摘要中的 `EffectDirection` 分布与构件表列
+  - 当前 `H_WEB_FLANGE_CONTINUITY_CLAUSE` 折型翼缘 cohort 已在 `v59` 统一显式为：
+    - `LeadClauseEffectCode = H_WEB_FLANGE_CONTINUITY_BREAK_EFFECT`
+    - `LeadClauseBreakEffectCount = 2`
+    - `LeadClauseRewriteEffectCount = 1`
+    - `LeadClauseEffectDirectionCode = BrokenCandidate`
+  - 这一步仍没有把 verdict 从 `ReviewRequired` 直接上推到 `Broken`；
+  - 但当前“方向”与“闸门”已经在工件层分离：
+    - 方向上，这批样本明确更像 `BrokenCandidate`
+    - 闸门上，当前仍保守停在 `ReadyForReview`
+  - 下一轮主问题因此进一步收紧为：
+    - 是否要把 `LeadClauseEffectDirection=BrokenCandidate + StableFull + B2/R1`
+    - 深接进 `ClauseVerdict` gate
+    - 还是继续要求额外结构锚点后才允许从 `ReviewRequired` 升到 `Broken`
+- `2026-04-23` 已在 [run_body_bracket_real_04_definition_clause_v58](/I:/autoteklasuanfa/.tmpresults/run_body_bracket_real_04_definition_clause_v58) 把 `DefinitionClauseEffect` 正式抬进 `full-run source` 的代表件与 assembly 聚合输出：
+  - [DefinitionClauseDecisionFullRunSourceCollector.cs](</I:/autoteklasuanfa/src/TeklaBodyBracketRecognition.App/DefinitionClauseDecisionFullRunSourceCollector.cs>)
+  - [DefinitionClauseDecisionFullRunSourceModels.cs](</I:/autoteklasuanfa/src/TeklaBodyBracketRecognition.App/DefinitionClauseDecisionFullRunSourceModels.cs>)
+  - [DefinitionClauseDecisionFullRunSourceArtifactBuilder.cs](</I:/autoteklasuanfa/src/TeklaBodyBracketRecognition.App/DefinitionClauseDecisionFullRunSourceArtifactBuilder.cs>)
+  - [DefinitionClauseDecisionFullRunSourceArtifactModels.cs](</I:/autoteklasuanfa/src/TeklaBodyBracketRecognition.App/DefinitionClauseDecisionFullRunSourceArtifactModels.cs>)
+  - 当前新增导出包括：
+    - 代表零件级 `TopologyRewriteDefinitionClauseEffectCode / LabelZh`
+    - assembly 级 `LeadClauseEffectCode / LabelZh / Share / MixStatus`
+    - assembly 级 `LeadClauseBreakEffectCount / LeadClauseRewriteEffectCount`
+    - Markdown 摘要中的 `DefinitionClauseEffect` 分布与 `Break/Rewrite` 构件表列
+  - 当前 `H_WEB_FLANGE_CONTINUITY_CLAUSE` 折型翼缘 cohort 已在 `v58` 明确显式化为稳定 effect 形态：
+    - `T3-2GL-5 / 9 / 10 / 49 / 50 / 51 / 52 / 53 / 54 / 55 / 56 / 57`
+    - 以及 `T3-2GKL-3`
+    - 均为：
+      - `LeadClauseEffectCode = H_WEB_FLANGE_CONTINUITY_BREAK_EFFECT`
+      - `LeadClauseEffectShare = 0.67`
+      - `LeadClauseEffectMixStatus = 混合效果`
+      - `LeadClauseBreakEffectCount = 2`
+      - `LeadClauseRewriteEffectCount = 1`
+  - 这一步没有继续把 assembly verdict 强推到 `Broken`，因为当前冻结门槛仍要求稳定的结构破坏锚点；
+  - 但下一轮已经不需要再从 review prompt 文本里猜 effect 结构，而可以直接基于结构化 `B2/R1` 输出，判断：
+    - 是继续停在 `ReviewRequired / ReadyForReview`
+    - 还是要把 `DefinitionClauseEffect` 更深接进 verdict gate
+- `2026-04-23` 已在 [run_body_bracket_real_04_definition_clause_v57](/I:/autoteklasuanfa/.tmpresults/run_body_bracket_real_04_definition_clause_v57) 把 `H_WEB_FLANGE_CONTINUITY_CLAUSE` 的折型翼缘 `H` 主链从 `effect-only` 推进到定义复核层：
+  - [DefinitionClauseDecisionFullRunSourceCollector.cs](</I:/autoteklasuanfa/src/TeklaBodyBracketRecognition.App/DefinitionClauseDecisionFullRunSourceCollector.cs>) 已新增窄 post-adapt override：
+    - 仅针对
+      - `LeadClauseCode = H_WEB_FLANGE_CONTINUITY_CLAUSE`
+      - `LeadClauseShare = 100%`
+      - `LeadClauseMix = SINGLE_CLAUSE`
+      - `TopologyRewriteShapeRoleCode = H_BENT_FLANGE_SECTION_REWRITE`
+      - `ProofType = H_MAIN_CONTOUR_PROOF`
+      - `FamilyProofTarget = H_WEB_FLANGE_PROOF_TARGET`
+    - 将这批已稳定成单一 `H` 条款的样本，从：
+      - `ClauseVerdict = InsufficientEvidence`
+      - `ClausePromotionReadiness = HoldEffectOnly`
+    - 收紧为：
+      - `ClauseVerdict = ReviewRequired`
+      - `ClausePromotionReadiness = ReadyForReview`
+  - 当前 assembly 级真实验证结果：
+    - `T3-2GL-5 / 9 / 10 / 49 / 50 / 51 / 52 / 53 / 54 / 55 / 56 / 57`
+    - 以及 `T3-2GKL-3`
+    - 均已在 `v57` 中达到：
+      - `LeadClauseCode = H_WEB_FLANGE_CONTINUITY_CLAUSE`
+      - `LeadClauseVerdictCode = ReviewRequired`
+      - `LeadClausePromotionReadinessCode = ReadyForReview`
+  - 其中本轮最关心的新增近邻样本：
+    - `T3-2GL-53`
+    - `T3-2GL-54`
+    - `T3-2GL-55`
+    - 当前已全部从 `v56` 的
+      - `InsufficientEvidence + HoldEffectOnly`
+    - 推进到 `v57` 的
+      - `ReviewRequired + ReadyForReview`
+  - 这说明当前 `H` 折型翼缘小类已经不再卡在“proof-chain 已起但只能保留 effect 提示”，而是正式进入阶段 5 -> 阶段 6 的定义复核闸门
+  - 下一轮主问题已进一步收紧为：
+    - 哪些 `H_WEB_FLANGE_CONTINUITY_CLAUSE` 行可继续从 `ReviewRequired`
+    - 上推到更明确的 `Broken / Satisfied / Promotion`
+- `2026-04-23` 已在 [run_body_bracket_real_04_definition_clause_v56](/I:/autoteklasuanfa/.tmpresults/run_body_bracket_real_04_definition_clause_v56) 完成 `real_04 definition-clause` 全量验证，并确认上一轮阶段 5 `H` 折型翼缘 proof-chain 扩边已经命中目标近邻样本：
+  - 当前 `T3-2GL-53 / 54 / 55` 均已从：
+    - `LeadClauseCode = NONE`
+    - `LeadClauseTier = Unset`
+    - `CLAUSE_MIX + LEAD_CLAUSE_NOT_STABLE_FULL`
+    - `TopologyRewriteDefinitionClauseCode = NONE`
+  - 收紧为：
+    - `LeadClauseCode = H_WEB_FLANGE_CONTINUITY_CLAUSE`
+    - `LeadClauseTier = StableFull`
+    - `TopologyRewriteShapeRoleCode = H_BENT_FLANGE_SECTION_REWRITE`
+    - `TopologyRewriteDefinitionClauseCode = H_WEB_FLANGE_CONTINUITY_CLAUSE`
+  - 这说明当前 `GL` 里“折型/异形翼缘但语义仍属 H 主截面”的阶段 5 proof-chain 已从：
+    - `T3-2GL-50 / 51 / 52 / 56 / 57`
+  - 扩到：
+    - `T3-2GL-53 / 54 / 55`
+  - 当前 `definition-clause-decision-fullrun-source.zh-CN.md` 中：
+    - `H_WEB_FLANGE_CONTINUITY_CLAUSE` 计数已从 `v55` 的 `18`
+    - 提升到 `v56` 的 `39`
+  - 当前仍未推进到 verdict/readiness 提升：
+    - 上述样本虽已起出稳定 `LeadClause`
+    - 但仍停在 `ClauseVerdict = InsufficientEvidence`
+    - `ClausePromotionReadiness = HoldEffectOnly`
+  - 这意味着下一轮主线应从“继续把 H proof-chain 挂起来”转向：
+    - 如何把 `H_WEB_FLANGE_CONTINUITY_CLAUSE` 从 effect-only / boundary-review，继续收紧到更稳定的 `ReviewRequired / Broken / SatisfiedCandidate` 升级门槛
+- `2026-04-23` 已继续把 `T3-2GL-51` 同类“`H` 大类但带折型/异形翼缘”的定义驱动 proof-chain 从单点样本扩到下一批近邻装配：
+  - [CoreBodyProofEngine.cs](</I:/autoteklasuanfa/src/TeklaBodyBracketRecognition.Core/Algorithms/CoreBodyProofEngine.cs>) 中 `H_BENT_FLANGE_SECTION_REWRITE` 的阶段 5 窄 bootstrap 仍保持在 proof-chain 层，不回退到旧启发式；
+  - 当前只对折型翼缘 `H` 小类的三个边界做了最小放宽：
+    - 强腹板候选阈值从 `BodyWidthRetentionRatio <= 0.35` 放宽到 `<= 0.45`
+    - 翼缘样候选阈值从 `>= 0.70` 放宽到 `>= 0.55`，但新增保留 `>= 0.70` 的翼缘锚点要求
+    - 输入主件约束从“`SpecialShape` 必须是输入主件”收紧为“这 `3` 个候选里必须且仅有 `1` 个输入主件”
+  - 这次放宽的目的不是回补旧 `BuiltUpT` 启发式，而是继续把真实语义上仍属于 `H` 主截面的折板翼缘样本接进：
+    - `H_MAIN_CONTOUR_PROOF`
+    - `H_WEB_FLANGE_PROOF_TARGET`
+    - `H_WEB_FLANGE_CONTINUITY_CLAUSE`
+  - 当前已编译验证通过：
+    - `dotnet build .\TeklaBodyBracketRecognition.sln`
+  - 当前待跑下一轮真实验证的近邻装配：
+    - `T3-2GL-53`
+    - `T3-2GL-54`
+    - `T3-2GL-55`
+  - 这三类样本此前卡住的边界现已明确：
+    - `T3-2GL-53`：腹板候选 `BodyWidthRetentionRatio = 0.429`，高于旧 `0.35`
+    - `T3-2GL-54`：输入主件落在平直翼缘 `BodyCandidate`，而不是折型 `SpecialShape`
+    - `T3-2GL-55`：翼缘样候选 `BodyWidthRetentionRatio = 0.677`，低于旧 `0.70`
+- `2026-04-23` 已在 [run_body_bracket_real_04_definition_clause_v55](/I:/autoteklasuanfa/.tmpresults/run_body_bracket_real_04_definition_clause_v55) 把 `T3-2GL-51` 这类“折型翼缘的 H 钢小类”接进阶段 5 proof-chain：
+  - 用户已明确：
+    - `T3-2GL-51` 语义上仍属于 `H`
+    - 只是有一块翼缘板是折型/异形
+    - 不应因为有一块折型翼缘就掉出 `H` 主截面
+  - [CoreBodyProofEngine.cs](</I:/autoteklasuanfa/src/TeklaBodyBracketRecognition.Core/Algorithms/CoreBodyProofEngine.cs>) 当前已新增窄 fallback：
+    - `2 x BodyCandidate` 板件
+    - `1 x SpecialShape` 输入主件
+    - 全部在多数优先站位持续命中并支撑包络
+    - 无闭环证据
+    - 且存在 `1` 条强腹板候选：`BodyWidthRetentionRatio <= 0.35`
+    - 同时其余 `2` 条为翼缘样候选：`BodyWidthRetentionRatio >= 0.70`
+  - 这批候选现在会统一起到新的 H 主链：
+    - `H_MAIN_CONTOUR_PROOF`
+    - `H_WEB_FLANGE_PROOF_TARGET`
+    - `H_WEB_FLANGE_CONTINUITY_CLAUSE`
+  - 当前真实验证结果：
+    - `T3-2GL-51` 已从：
+      - `NONE / NONE / NONE`
+      - `ClauseVerdict=InsufficientEvidence`
+      - `HoldEffectOnly`
+    - 收紧为：
+      - `LeadClauseCode = H_WEB_FLANGE_CONTINUITY_CLAUSE`
+      - 代表腹板件 `29733385` 命中 `H_WEB_FLANGE_CONTINUITY_BREAK_EFFECT`
+      - 折型翼缘输入主件 `29733378` 命中 `H_WEB_FLANGE_CONTINUITY_REWRITE_EFFECT`
+  - 这说明当前 `GL` 的这条小类已经不再只是“上游分类成 H，下游 proof-chain 为空”，而是已进入真正的 H 证明链
+- `2026-04-23` 已在 [run_body_bracket_real_04_definition_clause_v54](/I:/autoteklasuanfa/.tmpresults/run_body_bracket_real_04_definition_clause_v54) 吃掉 `T3-2YPGL-5` 这类“闭合箱壳 + 折板翼缘”小类：
+  - 用户已明确：
+    - `T3-2YPGL-5` 仍属于闭合箱形截面
+    - 只是其中一块翼缘板是折板
+    - 不应因为“不是严格矩形 / 有折板”就掉出 `BOX`
+  - [CoreBodyProofEngine.cs](</I:/autoteklasuanfa/src/TeklaBodyBracketRecognition.Core/Algorithms/CoreBodyProofEngine.cs>) 已把闭合箱壳 fallback 从“仅 `BodyCandidate` 壁壳”放宽为：
+    - 允许 `BodyCandidate` 主壁板
+    - 加上带同等闭环破坏证据的 `SpecialShape` 折板壳件
+  - 当前窄规则仍保持保守门槛：
+    - 必须是 `PL*`
+    - 必须 `ClosedLoopStationCountBeforeRemoval > 0`
+    - 且移除后 `ClosedLoopStationCountAfterRemoval = 0`
+    - 且 `LostClosedLoopStationIds > 0`
+    - 且在多数优先站位持续出现并支撑包络
+  - 当前真实验证结果：
+    - `T3-2YPGL-5` 已从：
+      - `BROKEN_STRUCTURE_NEEDS_PROOF_CHAIN`
+    - 收紧为：
+      - `PAIRED_WALL_MAIN_CONTOUR_PROOF`
+      - `BOX_WALL_PAIR_PROOF_TARGET`
+      - `BOX_CLOSED_LOOP_OPPOSITE_WALL_CLAUSE`
+  - 这说明：
+    - 当前 `BOX` 语义已进一步收紧成：
+      - “闭合箱壁壳”
+      - 包含一条受控小类：`闭合箱壳 + 折板翼缘变体`
+    - 语义核心仍是闭合箱形截面，而不是“矩形箱”
+- `2026-04-23` 已在 [run_body_bracket_real_04_definition_clause_v53](/I:/autoteklasuanfa/.tmpresults/run_body_bracket_real_04_definition_clause_v53) 把 `MJ / MQMJ / YPGL` 的 proof-chain 启动规则前移到 [CoreBodyProofEngine.cs](</I:/autoteklasuanfa/src/TeklaBodyBracketRecognition.Core/Algorithms/CoreBodyProofEngine.cs>)：
+  - 对 `MJ / MQMJ` 这类“单主板 + 锚筋/附属杆件”的埋件类，新增窄 fallback：
+    - 当 assembly 内只有 `1` 个输入主板 `CoreBodyPart`
+    - 且移除后 `BodyCoverage / EnvelopeCoverage` 直接掉到 `0`
+    - 且不存在其它 `BodyCandidate` 主体板
+    - 则直接启动：
+      - `SINGLE_PRIMARY_PLATE_PROOF`
+      - `SINGLE_PRIMARY_PLATE_SYSTEM_TARGET`
+      - `PRIMARY_PLATE_CONTINUITY_CLAUSE`
+  - 对 `YPGL / BOX` 这类“闭合箱形截面但不要求矩形”的样本，新增窄 fallback：
+    - 当 assembly 内至少 `3` 个 `BodyCandidate` 主板在闭环站位上
+      - `ClosedLoopStationCountBeforeRemoval > 0`
+      - `ClosedLoopStationCountAfterRemoval = 0`
+      - `LostClosedLoopStationIds > 0`
+    - 则把这些外壁壳件直接启动到：
+      - `PAIRED_WALL_MAIN_CONTOUR_PROOF`
+      - `BOX_WALL_PAIR_PROOF_TARGET`
+      - `BOX_CLOSED_LOOP_OPPOSITE_WALL_CLAUSE`
+    - 并新增内部 `ShapeRoleCode=CLOSED_BOX_WALL_SHELL_REWRITE`，明确它是“闭合箱壁壳”语义，而不是“矩形箱”假设
+  - 同时已补上保护：
+    - fallback 预填的 `FamilyRisk / ProofType / FamilyProofTarget / DefinitionClause`
+    - 不再被后续 resolver 覆盖回 `NONE`
+  - 当前真实样本验证结果：
+    - `T3-2MJ-1` 已起出 `SINGLE_PRIMARY_PLATE_PROOF -> SINGLE_PRIMARY_PLATE_SYSTEM_TARGET -> PRIMARY_PLATE_CONTINUITY_CLAUSE`
+    - `T3-2MQMJ-1` 已起出 `SINGLE_PRIMARY_PLATE_PROOF -> SINGLE_PRIMARY_PLATE_SYSTEM_TARGET -> PRIMARY_PLATE_CONTINUITY_CLAUSE`
+    - `T3-2YPGL-12 / 17 / 23` 已起出 `PAIRED_WALL_MAIN_CONTOUR_PROOF -> BOX_WALL_PAIR_PROOF_TARGET -> BOX_CLOSED_LOOP_OPPOSITE_WALL_CLAUSE`
+    - `T3-2YPGL-5` 仍保持 `BROKEN_STRUCTURE_NEEDS_PROOF_CHAIN`
+  - 这说明：
+    - `MJ / MQMJ` 的典型埋件主线已经不再停在 `NEEDS_PROOF_CHAIN`
+    - `BOX` 语义已从“矩形箱”收紧到“闭合箱壁壳”
+    - 但 `YPGL` 里仍有一支 `special-shape / 非 BodyCandidate 壁壳` 变体尚未被这条窄规则覆盖
+- `2026-04-23` 已在 [run_body_bracket_real_04_definition_clause_v50](/I:/autoteklasuanfa/.tmpresults/run_body_bracket_real_04_definition_clause_v50) 把最大非 `GL` 主桶从“缺条款锚点”进一步收紧成“缺 proof chain”：
+  - [DefinitionClauseDecisionFullRunSourceCollector.cs](</I:/autoteklasuanfa/src/TeklaBodyBracketRecognition.App/DefinitionClauseDecisionFullRunSourceCollector.cs>)
+  - [definition-clause-decision-fullrun-source.json](/I:/autoteklasuanfa/.tmpresults/run_body_bracket_real_04_definition_clause_v50/definition-clause-decision-fullrun-source.json)
+  - 当前规则更新为：
+    - 若结构破坏已成立、own-clause 为空、assembly 也无稳定 lead-clause
+    - 且 `ProofType / FamilyProofTarget` 仍全空
+    - 则不再记作宽泛 `BROKEN_STRUCTURE_NEEDS_CLAUSE_ANCHOR`
+    - 而是改记为更准确的 `BROKEN_STRUCTURE_NEEDS_PROOF_CHAIN`
+  - 当前 `MJ / YPGL` 的 assembly 级 verdict / readiness 分布没有变化：
+    - `36 x 仍需复核 / 可进入定义复核`
+    - `4 x 条款破坏 / 可进入阶段 6 提升`
+    - `1 x 条款满足 / 可进入阶段 6 提升`
+    - `1 x 无条款判定 / 无提升准备度`
+  - 但当前最大的代表件主桶已从：
+    - `CLAUSE_MIX + LEAD_CLAUSE_NOT_STABLE_FULL + BROKEN_STRUCTURE_NEEDS_CLAUSE_ANCHOR`
+    - 收紧为：
+    - `CLAUSE_MIX + LEAD_CLAUSE_NOT_STABLE_FULL + BROKEN_STRUCTURE_NEEDS_PROOF_CHAIN`
+  - 这说明当前主矛盾已进一步明确：
+    - 对这批 `MJ / YPGL` 行，问题不再只是“缺 clause anchor”
+    - 而是 upstream 还没有把 `ProofType / FamilyProofTarget / DefinitionClause` 这条 proof chain 真正建立起来
+- `2026-04-23` 已在 [run_body_bracket_real_04_definition_clause_v49](/I:/autoteklasuanfa/.tmpresults/run_body_bracket_real_04_definition_clause_v49) 完成 `MJ / YPGL` 的 `BOUNDARY_REVIEW` 语义拆分：
+  - [DefinitionClauseDecisionFullRunSourceCollector.cs](</I:/autoteklasuanfa/src/TeklaBodyBracketRecognition.App/DefinitionClauseDecisionFullRunSourceCollector.cs>)
+  - [definition-clause-decision-fullrun-source.json](/I:/autoteklasuanfa/.tmpresults/run_body_bracket_real_04_definition_clause_v49/definition-clause-decision-fullrun-source.json)
+  - 当前已不再把所有 `ProofClass=ReviewRequired` 的 side-row 一律记成 `BOUNDARY_REVIEW`
+  - 新规则是：
+    - 只有“已带 own-clause 或已进入 proof-type / family-target 证明链”的 review 行，才继续记作 `BOUNDARY_REVIEW`
+    - 对 `NONE / NONE / NONE + INSUFFICIENT_PERSISTENT_PROOF` 这类 side-row，改记为 `SIDE_ROW_PERSISTENCE_REVIEW`
+  - 当前验证结果：
+    - `MJ / YPGL` assembly 级 verdict / readiness 分布未被放大，也没有回退
+    - 原先混入 `BOUNDARY_REVIEW` 的 `9` 条弱 side-row 已全部改落为 `SIDE_ROW_PERSISTENCE_REVIEW`
+    - `MJ-10 / MJ-12` 这类真正的 `CLUSTER_DIRECT_CONTROL_EXCLUSION_CLAUSE` 复核行仍保持 `BOUNDARY_REVIEW`
+  - 这说明当前阶段 5/6 的复核语义已经进一步拆清：
+    - `BOUNDARY_REVIEW` 更接近“已进入定义证明链但边界仍需人工复核”
+    - `SIDE_ROW_PERSISTENCE_REVIEW` 更接近“旁路件自身持续性不足，不应冒充主语义冲突”
+- `2026-04-23` 已在 [run_body_bracket_real_04_definition_clause_v48](/I:/autoteklasuanfa/.tmpresults/run_body_bracket_real_04_definition_clause_v48) 完成首轮 `GL` lead-clause 稳定化收口：
+  - [DefinitionClauseDecisionFullRunSourceCollector.cs](</I:/autoteklasuanfa/src/TeklaBodyBracketRecognition.App/DefinitionClauseDecisionFullRunSourceCollector.cs>)
+  - [definition-clause-decision-fullrun-source.json](/I:/autoteklasuanfa/.tmpresults/run_body_bracket_real_04_definition_clause_v48/definition-clause-decision-fullrun-source.json)
+  - 当前已把 `GL` 中 `3` 个典型“`2 x BOX 对壁条款 + 1 x SINGLE_PRIMARY 直控主板条款`”装配从伪 `ClauseMix` 收紧成稳定 `BOX_CLOSED_LOOP_OPPOSITE_WALL_CLAUSE`
+  - 这 `3` 个真实装配：
+    - `T3-2GL-15`
+    - `T3-2GL-20`
+    - `T3-2GL-97`
+  - 现在都已从：
+    - `条款混合 / 仅保留 effect 提示`
+    - 收紧为 `条款满足 / 可进入阶段 6 提升`
+  - 当前这条收紧规则只落在 `full-run source` 聚合层，语义是：
+    - 当同一 assembly 内存在 `2` 条 `BOX_WALL_PAIR_PROOF_TARGET -> BOX_CLOSED_LOOP_OPPOSITE_WALL_CLAUSE`
+    - 且仅有 `1` 条 `SINGLE_PRIMARY_PLATE_PROOF -> PRIMARY_PLATE_CONTINUITY_CLAUSE`
+    - 并且这条单主板行是 `DIRECT_ENVELOPE_CONTROLLER`
+    - 则把它视为 `BOX` 对壁主条款下的 shadow-primary 行，不再把整装配判成真实条款混合
+  - 已确认这一步没有放大 `YPGL` 主板连续性主线：
+    - `T3-2YPGL-18` 仍保持 `条款破坏 / 可进入阶段 6 提升`
+  - `GL` assembly 级分布也已同步收敛：
+    - `91 x 仍需复核 / 可进入定义复核`
+    - `23 x 证据不足 / 仅保留 effect 提示`
+    - `8 x 无条款判定 / 无提升准备度`
+    - `3 x 条款满足 / 可进入阶段 6 提升`
+    - `2 x 条款破坏 / 可进入阶段 6 提升`
+- `2026-04-23` 已对 `v47` 剩余 `GL` 大盘做完一轮收口核查：
+  - [run_body_bracket_real_04_definition_clause_v47](/I:/autoteklasuanfa/.tmpresults/run_body_bracket_real_04_definition_clause_v47)
+  - [definition-clause-decision-fullrun-source.json](/I:/autoteklasuanfa/.tmpresults/run_body_bracket_real_04_definition_clause_v47/definition-clause-decision-fullrun-source.json)
+- 当前 `GL` 剩余 `仍需复核 / 可进入定义复核` 的主桶已经非常单一：
+  - `73` 条代表件都落在 `CLAUSE_MIX + LEAD_CLAUSE_NOT_STABLE_FULL + BROKEN_STRUCTURE_NEEDS_CLAUSE_ANCHOR`
+  - 这些样本的 assembly 级 `LeadClause` 为空或不稳定，当前没有再出现像 `MJ / YPGL` 那样可安全借用的 `LeadClause=100%` sibling-broken 候选
+- 这说明：
+  - `GL` 当前不适合继续沿“借 assembly 主条款锚点”这条线硬推 `Broken`
+  - 下一轮若继续推进 `GL`，重点应回到“怎样先把 assembly lead-clause 稳定起来”，而不是继续在 mapper gate 上加更激进的 promotion 规则
+- `2026-04-23` 已把 `BROKEN_STRUCTURE_CAN_BORROW_LEAD_CLAUSE_ANCHOR` 这批窄候选正式从 `ReviewRequired` 上推到 `Broken`，但仍保守停在 `ReadyForReview`：
+  - [DefinitionClauseDecisionBridgeEffectSnapshot.cs](</I:/autoteklasuanfa/src/TeklaBodyBracketRecognition.Core/Algorithms/DefinitionClauseDecisionBridgeEffectSnapshot.cs>)
+  - [DefinitionClauseDecisionBridgeEffectAdapter.cs](</I:/autoteklasuanfa/src/TeklaBodyBracketRecognition.Core/Algorithms/DefinitionClauseDecisionBridgeEffectAdapter.cs>)
+  - [DefinitionClauseDecisionBridgeTierModels.cs](</I:/autoteklasuanfa/src/TeklaBodyBracketRecognition.Core/Algorithms/DefinitionClauseDecisionBridgeTierModels.cs>)
+  - [DefinitionClauseDecisionBridgeMapper.cs](</I:/autoteklasuanfa/src/TeklaBodyBracketRecognition.Core/Algorithms/DefinitionClauseDecisionBridgeMapper.cs>)
+  - [DefinitionClauseDecisionBridgeMapperFixtures.cs](</I:/autoteklasuanfa/src/TeklaBodyBracketRecognition.Core/Algorithms/DefinitionClauseDecisionBridgeMapperFixtures.cs>)
+  - [DefinitionClauseDecisionBridgeEffectAdapterFixtures.cs](</I:/autoteklasuanfa/src/TeklaBodyBracketRecognition.Core/Algorithms/DefinitionClauseDecisionBridgeEffectAdapterFixtures.cs>)
+  - [DefinitionClauseDecisionFullRunSourceCollector.cs](</I:/autoteklasuanfa/src/TeklaBodyBracketRecognition.App/DefinitionClauseDecisionFullRunSourceCollector.cs>)
+  - [run_body_bracket_real_04_definition_clause_v47](/I:/autoteklasuanfa/.tmpresults/run_body_bracket_real_04_definition_clause_v47)
+  - [definition-clause-decision-fullrun-source.json](/I:/autoteklasuanfa/.tmpresults/run_body_bracket_real_04_definition_clause_v47/definition-clause-decision-fullrun-source.json)
+  - [definition-clause-decision-fullrun-source.zh-CN.md](/I:/autoteklasuanfa/.tmpresults/run_body_bracket_real_04_definition_clause_v47/definition-clause-decision-fullrun-source.zh-CN.md)
+- 当前新增了一条更窄的 stage 5 -> stage 6 破坏判定通道：
+  - 样本本身已是 `BrokenCandidate`
+  - `LeadClause=100%`
+  - 同一 assembly 已存在 own-clause sibling `Broken` 行
+  - 当前行仅缺 own-clause 锚点，而不是缺真实结构破坏
+  - 允许 verdict 上推到 `Broken`
+  - 但 readiness 仍保守停在 `ReadyForReview`
+- 这一步后，`real_04 / v47` 里被精确命中的是真实 `7` 条候选：
+  - `YPGL`：`5` 条
+  - `MJ`：`2` 条
+- 这些样本现在都已从：
+  - `仍需复核 / 可进入定义复核`
+  - 收紧为 `条款破坏 / 可进入定义复核`
+- 当前 `GKZ / HXZ / GL` 的 assembly 级分布基本未被放大：
+  - `GKZ` 仍保持 `11 x 条款满足 / 可进入阶段 6 提升`
+  - `HXZ` 仍保持 `7 x 条款满足 / 可进入阶段 6 提升` 与 `1 x 仍需复核 / 可进入定义复核`
+  - `GL` 仍主要停在 `仍需复核 / 可进入定义复核`
+- 这说明当前规则收紧是局部生效的，并没有把整批 `BROKEN_STRUCTURE_NEEDS_CLAUSE_ANCHOR` 或 `GL` 大盘一起推成 `Broken`。
+- `2026-04-23` 已继续把“缺条款锚点”的复核桶再细分成“真的缺锚点”和“可借 assembly 主条款锚点”两档：
+  - [DefinitionClauseDecisionFullRunSourceCollector.cs](</I:/autoteklasuanfa/src/TeklaBodyBracketRecognition.App/DefinitionClauseDecisionFullRunSourceCollector.cs>)
+  - [run_body_bracket_real_04_definition_clause_v45](/I:/autoteklasuanfa/.tmpresults/run_body_bracket_real_04_definition_clause_v45)
+  - [definition-clause-decision-fullrun-source.json](/I:/autoteklasuanfa/.tmpresults/run_body_bracket_real_04_definition_clause_v45/definition-clause-decision-fullrun-source.json)
+  - [definition-clause-decision-fullrun-source.zh-CN.md](/I:/autoteklasuanfa/.tmpresults/run_body_bracket_real_04_definition_clause_v45/definition-clause-decision-fullrun-source.zh-CN.md)
+- 当前新增了更细的一类真实复核原因：
+  - `BROKEN_STRUCTURE_CAN_BORROW_LEAD_CLAUSE_ANCHOR`
+- 这一步后，`real_04 / v45` 已能把 `ReviewRequired` 明确拆成三档：
+  - `GL`：当前主桶仍是 `CLAUSE_MIX + LEAD_CLAUSE_NOT_STABLE_FULL + BROKEN_STRUCTURE_NEEDS_CLAUSE_ANCHOR`
+  - `MJ`：除 `BOUNDARY_REVIEW` 与 `NEEDS_CLAUSE_ANCHOR` 外，已新出现 `2` 条 `PART_CLAUSE_DIFFERS_FROM_LEAD + BROKEN_STRUCTURE_CAN_BORROW_LEAD_CLAUSE_ANCHOR`
+  - `YPGL`：除 `NEEDS_CLAUSE_ANCHOR` 主桶外，已新出现 `5` 条 `PART_CLAUSE_DIFFERS_FROM_LEAD + BROKEN_STRUCTURE_CAN_BORROW_LEAD_CLAUSE_ANCHOR`
+- 当前这批“可借锚”样本已经具备共同特征：
+  - 同一 assembly 内已有 sibling part 落成 `条款破坏 / 可进入阶段 6 提升`
+  - assembly 的 `LeadClause=100%`
+  - 当前 review part 自身 `TopologyRewriteDefinitionClause=NONE`
+  - 但 `TopologyTier=闭环直接丢失`
+  - 且 `ProofCompleteness=未收敛`
+- 这说明下一轮若要继续把 `ReviewRequired` 上推到 `Broken`，最安全的入口已经不是整批 `GL / MJ / YPGL`，而是先只围绕这 `7` 条 `CAN_BORROW_LEAD_CLAUSE_ANCHOR` 候选做收紧。
+- `2026-04-23` 已继续把 `ReviewRequired` 从“统一复核桶”拆成更可解释的真实原因：
+  - [DefinitionClauseDecisionFullRunSourceCollector.cs](</I:/autoteklasuanfa/src/TeklaBodyBracketRecognition.App/DefinitionClauseDecisionFullRunSourceCollector.cs>)
+  - [run_body_bracket_real_04_definition_clause_v44](/I:/autoteklasuanfa/.tmpresults/run_body_bracket_real_04_definition_clause_v44)
+  - [definition-clause-decision-fullrun-source.json](/I:/autoteklasuanfa/.tmpresults/run_body_bracket_real_04_definition_clause_v44/definition-clause-decision-fullrun-source.json)
+  - [definition-clause-decision-fullrun-source.zh-CN.md](/I:/autoteklasuanfa/.tmpresults/run_body_bracket_real_04_definition_clause_v44/definition-clause-decision-fullrun-source.zh-CN.md)
+- 当前已为真实 full-run 代表件补出两类新的复核原因：
+  - `BROKEN_STRUCTURE_NEEDS_CLAUSE_ANCHOR`
+  - `BROKEN_STRUCTURE_NEEDS_COMPLETE_PROOF`
+- 这一步后，`real_04 / v44` 的 `ReviewRequired` 已能直接分桶：
+  - `GL`：大多数 `仍需复核` 现在明确是 `CLAUSE_MIX + LEAD_CLAUSE_NOT_STABLE_FULL + BROKEN_STRUCTURE_NEEDS_CLAUSE_ANCHOR`
+  - `YPGL`：大多数 `仍需复核` 也明确是 `CLAUSE_MIX + LEAD_CLAUSE_NOT_STABLE_FULL + BROKEN_STRUCTURE_NEEDS_CLAUSE_ANCHOR`
+  - `MJ`：一部分是 `BROKEN_STRUCTURE_NEEDS_CLAUSE_ANCHOR`，另一部分已清楚落成纯 `BOUNDARY_REVIEW`
+- 这说明当前阶段 5/6 的主矛盾已经进一步收窄：
+  - 大批 `GL / YPGL / MJ` 不再是“结构信号不够”，而是“结构破坏已成立，但缺稳定条款锚点”
+  - 少量 `MJ` 不是条款锚点问题，而是边界/分区仍需要人工复核
+- 下一轮推进可以直接围绕这两个桶分别收紧，而不必继续在同一批 `ReviewRequired` 上混做规则。
+- `2026-04-23` 已继续把阶段 5 -> 阶段 6 的语义闸门收紧到“结构破坏已成立但条款锚点不足时，优先进入定义复核，而不是继续停在 effect-only”：
+  - [DefinitionClauseDecisionBridgeMapper.cs](</I:/autoteklasuanfa/src/TeklaBodyBracketRecognition.Core/Algorithms/DefinitionClauseDecisionBridgeMapper.cs>)
+  - [DefinitionClauseDecisionBridgeMapperFixtures.cs](</I:/autoteklasuanfa/src/TeklaBodyBracketRecognition.Core/Algorithms/DefinitionClauseDecisionBridgeMapperFixtures.cs>)
+  - [DefinitionClauseDecisionBridgeEffectAdapterFixtures.cs](</I:/autoteklasuanfa/src/TeklaBodyBracketRecognition.Core/Algorithms/DefinitionClauseDecisionBridgeEffectAdapterFixtures.cs>)
+  - [run_body_bracket_real_04_definition_clause_v43](/I:/autoteklasuanfa/.tmpresults/run_body_bracket_real_04_definition_clause_v43)
+  - [definition-clause-decision-fullrun-source.json](/I:/autoteklasuanfa/.tmpresults/run_body_bracket_real_04_definition_clause_v43/definition-clause-decision-fullrun-source.json)
+  - [definition-clause-decision-fullrun-source.zh-CN.md](/I:/autoteklasuanfa/.tmpresults/run_body_bracket_real_04_definition_clause_v43/definition-clause-decision-fullrun-source.zh-CN.md)
+- 当前新增了一条更保守但更可解释的 gate：
+  - 当样本已经是 `BrokenCandidate`
+  - 且 `real_input + 多数优先站位 + 闭环/包络真实丢失`
+  - 但 `LeadClause / ProofCompleteness / boundary conflict` 还不够完整时
+  - 不再直接掉回 `证据不足 / 仅保留 effect 提示`
+  - 而是提升到 `仍需复核 / 可进入定义复核`
+- 这一步后，`real_04 / v43` 的真实结果变成：
+  - `GKZ`：`11` 个 assembly 仍全部保持 `条款满足 / 可进入阶段 6 提升`
+  - `HXZ`：`7` 个 assembly 保持 `条款满足 / 可进入阶段 6 提升`，`1` 个进入 `仍需复核 / 可进入定义复核`
+  - `MJ`：从原先以 `证据不足 / effect-only` 为主，收紧为 `14` 个 `仍需复核 / 可进入定义复核`、`2` 个 `条款破坏 / 可进入阶段 6 提升`、`1` 个 `条款满足 / 可进入阶段 6 提升`
+  - `YPGL`：从原先以 `证据不足 / effect-only` 为主，收紧为 `22` 个 `仍需复核 / 可进入定义复核`、`2` 个 `条款破坏 / 可进入阶段 6 提升`
+  - `GL`：从原先大多 `证据不足 / effect-only`，收紧为 `91` 个 `仍需复核 / 可进入定义复核`、`23` 个 `证据不足 / 仅保留 effect 提示`、`3` 个 `条款混合 / 仅保留 effect 提示`、`2` 个 `条款破坏 / 可进入阶段 6 提升`
+- 当前 `MJ / YPGL / GL` 的主要卡点已从“是否存在真实结构破坏信号”推进到“这些结构破坏为什么还不能自动提升”，并稳定暴露成：
+  - `CLAUSE_MIX + LEAD_CLAUSE_NOT_STABLE_FULL`
+  - `BOUNDARY_REVIEW`
+  - `PART_CLAUSE_DIFFERS_FROM_LEAD`
+- 这说明下一轮不必再重复争论“这些样本只是 effect 提示还是没有真实结构含义”，而应继续收紧：
+  - 哪些 `ReviewRequired` 已足够再升级成 `Broken`
+  - 哪些仍必须保守停在 `ReadyForReview`
+- `2026-04-23` 已用当前 `real_04` 可用输入完成一轮新的真实 `full-run source` 复跑：
+  - [run_body_bracket_real_04_definition_clause_v42](/I:/autoteklasuanfa/.tmpresults/run_body_bracket_real_04_definition_clause_v42)
+  - [definition-clause-decision-fullrun-source.json](/I:/autoteklasuanfa/.tmpresults/run_body_bracket_real_04_definition_clause_v42/definition-clause-decision-fullrun-source.json)
+  - [definition-clause-decision-fullrun-source.zh-CN.md](/I:/autoteklasuanfa/.tmpresults/run_body_bracket_real_04_definition_clause_v42/definition-clause-decision-fullrun-source.zh-CN.md)
+- 这一步已确认：`real_04` 真实输入里确实覆盖了 `MJ / YPGL / GL / GKZ / HXZ`，不再只是 `real_01` 那批只覆盖 `GKZ / HXZ / GL` 的样本。
+- 当前 `GKZ` 在 `real_04 / v42` 构件级已稳定落在 `条款满足 / 可进入阶段 6 提升`，`HXZ` 大多也能稳定落在 `条款满足 / 可进入阶段 6 提升`，仅少量旁路件仍停在 `证据不足 / 仅保留 effect 提示`。
+- 当前 `MJ` 在 `real_04 / v42` 已出现真实分化：
+  - 多数构件仍停在 `证据不足 / 仅保留 effect 提示`
+  - 少量进入 `仍需复核 / 可进入定义复核`
+  - 少量已到 `条款破坏 / 可进入阶段 6 提升`
+  - 个别已到 `条款满足 / 可进入阶段 6 提升`
+- 当前 `YPGL` 在 `real_04 / v42` 也已出现真实分化：
+  - 多数构件仍停在 `证据不足 / 仅保留 effect 提示`
+  - 少量进入 `仍需复核 / 可进入定义复核`
+  - 少量已到 `条款破坏 / 可进入阶段 6 提升`
+- 当前 `MJ / YPGL / GL` 的代表件级卡点已从“没有真实输入”推进到“有明确冲突模式”：
+  - `CLAUSE_MIX + LEAD_CLAUSE_NOT_STABLE_FULL`
+  - `BOUNDARY_REVIEW`
+  - `PART_CLAUSE_DIFFERS_FROM_LEAD`
+- 这说明下一轮阶段 5/6 语义推进的主焦点应继续放在真实冲突判据和升级闸门，而不是再回到“是否存在 `MJ / YPGL` 真实样本”的输入确认。
+- `2026-04-23` 已完成真实 `full-run source` 主链复跑与构件级聚合口径修正：
+  - [DefinitionClauseDecisionFullRunSourceCollector.cs](</I:/autoteklasuanfa/src/TeklaBodyBracketRecognition.App/DefinitionClauseDecisionFullRunSourceCollector.cs>)
+  - [run_body_bracket_real_01_definition_clause_v41](/I:/autoteklasuanfa/.tmpresults/run_body_bracket_real_01_definition_clause_v41)
+  - [definition-clause-decision-fullrun-source.json](/I:/autoteklasuanfa/.tmpresults/run_body_bracket_real_01_definition_clause_v41/definition-clause-decision-fullrun-source.json)
+  - [definition-clause-decision-fullrun-source.zh-CN.md](/I:/autoteklasuanfa/.tmpresults/run_body_bracket_real_01_definition_clause_v41/definition-clause-decision-fullrun-source.zh-CN.md)
+- 当前已把构件级聚合从“全量代表件直接汇总”收紧为“优先只聚合自身带 `DefinitionClause` 语义的代表件；若完全没有，再回退到较宽语义行”。
+- 这一步后，`GKZ` 在真实工件里已不再被无条款旁路件拖成伪混合，而是重新分化成：
+  - 一部分构件 `条款满足 / 可进入阶段 6 提升`
+  - 一部分构件 `仍需复核 / 可进入定义复核`
+- 当前 `GL` 在这批 `real_01` 真实样本里仍大多停在：
+  - `证据不足 / 仅保留 effect 提示`
+  - 少量 `条款混合 / 仅保留 effect 提示`
+  - 少量 `仍需复核 / 可进入定义复核`
+- 本轮 `real_01` 数据未覆盖到 `MJ / YPGL`，所以下一轮需要继续找包含这两类构件的真实输入，再复核它们是卡在 `ProofCompleteness`、`ConflictReasons` 还是 `ReviewConflict`。
+- `2026-04-23` 已把阶段 5 的真实 full-run 语义信号正式接进 `EffectSnapshot -> tier -> verdict -> readiness` 主链：
+  - [DefinitionClauseDecisionFullRunSourceCollector.cs](</I:/autoteklasuanfa/src/TeklaBodyBracketRecognition.App/DefinitionClauseDecisionFullRunSourceCollector.cs>)
+  - [DefinitionClauseDecisionFullRunSourceModels.cs](</I:/autoteklasuanfa/src/TeklaBodyBracketRecognition.App/DefinitionClauseDecisionFullRunSourceModels.cs>)
+  - [DefinitionClauseDecisionFullRunSourceArtifactBuilder.cs](</I:/autoteklasuanfa/src/TeklaBodyBracketRecognition.App/DefinitionClauseDecisionFullRunSourceArtifactBuilder.cs>)
+  - [DefinitionClauseDecisionFullRunSourceArtifactModels.cs](</I:/autoteklasuanfa/src/TeklaBodyBracketRecognition.App/DefinitionClauseDecisionFullRunSourceArtifactModels.cs>)
+- 当前 `CoreBodyProof` 的真实输出已不再只停在 `DefinitionClause / Effect / LeadClauseShare` 的原始提示层，而是会继续导出：
+  - `SourceTier / StationTier / TopologyTier / ProofCompletenessTier / LeadClauseTier`
+  - `CandidateDirection / ClauseVerdict / ClausePromotionReadiness`
+  - `ConflictReasons`
+  - 构件级 `LeadClauseVerdict / LeadClausePromotionReadiness / MixStatus`
+- 这一步的目标不是回头继续清旧链，而是先让 `GL / MJ / YPGL` 这类样本在真实 full-run 工件里明确暴露“为什么仍停在 mixed/review/hold-effect-only”，为下一轮继续收紧阶段 5 -> 阶段 6 升级门槛准备真实诊断面。
+- `2026-04-22` 已把 `TopologyTier=None` 与 `TargetOnly` 语义收紧直接落进夹具回归：
+  - [DefinitionClauseDecisionBridgeMapperFixtures.cs](</I:/autoteklasuanfa/src/TeklaBodyBracketRecognition.Core/Algorithms/DefinitionClauseDecisionBridgeMapperFixtures.cs>)
+  - [DefinitionClauseDecisionBridgeEffectAdapterFixtures.cs](</I:/autoteklasuanfa/src/TeklaBodyBracketRecognition.Core/Algorithms/DefinitionClauseDecisionBridgeEffectAdapterFixtures.cs>)
+- 当前新增了：
+  - `SYNTHETIC_NONE_TOPOLOGY`
+  - `SYNTHETIC_TARGET_ONLY_REVIEW`
+- 这一步把“无拓扑信号应降回 `INSUFFICIENT_EVIDENCE/HOLD_EFFECT_ONLY`”和“仅目标半完整证明应进 `REVIEW_REQUIRED/READY_FOR_REVIEW`”从口头规则变成了代码级回归样本。
+- `2026-04-22` 已收紧 bridge mapper 的 tier 语义：
+  - [DefinitionClauseDecisionBridgeTierModels.cs](</I:/autoteklasuanfa/src/TeklaBodyBracketRecognition.Core/Algorithms/DefinitionClauseDecisionBridgeTierModels.cs>)
+  - [DefinitionClauseDecisionBridgeMapper.cs](</I:/autoteklasuanfa/src/TeklaBodyBracketRecognition.Core/Algorithms/DefinitionClauseDecisionBridgeMapper.cs>)
+- 当前已补上显式 `TopologyTier=None`，并把 `ProofCompletenessTier` 的 `TypeOnly / TargetOnly` 从同值别名改成独立层级，避免后续 artifact/summary 把两种“半完整证明”混成一类。
+- `2026-04-22` 已新增统一 bridge validation bundle：
+  - [DefinitionClauseDecisionBridgeValidationBundleManifest.cs](</I:/autoteklasuanfa/src/TeklaBodyBracketRecognition.App/DefinitionClauseDecisionBridgeValidationBundleManifest.cs>)
+  - [DefinitionClauseDecisionBridgeValidationBundleSerializer.cs](</I:/autoteklasuanfa/src/TeklaBodyBracketRecognition.App/DefinitionClauseDecisionBridgeValidationBundleSerializer.cs>)
+  - [DefinitionClauseDecisionBridgeValidationBundleSummaryBuilder.cs](</I:/autoteklasuanfa/src/TeklaBodyBracketRecognition.App/DefinitionClauseDecisionBridgeValidationBundleSummaryBuilder.cs>)
+  - [DefinitionClauseDecisionBridgeValidationBundleReadmeBuilder.cs](</I:/autoteklasuanfa/src/TeklaBodyBracketRecognition.App/DefinitionClauseDecisionBridgeValidationBundleReadmeBuilder.cs>)
+  - [DefinitionClauseDecisionBridgeValidationBundleWorkflowResult.cs](</I:/autoteklasuanfa/src/TeklaBodyBracketRecognition.App/DefinitionClauseDecisionBridgeValidationBundleWorkflowResult.cs>)
+  - [DefinitionClauseDecisionBridgeValidationBundleWorkflow.cs](</I:/autoteklasuanfa/src/TeklaBodyBracketRecognition.App/DefinitionClauseDecisionBridgeValidationBundleWorkflow.cs>)
+  - [DEFINITION_CLAUSE_DECISION_BRIDGE_VALIDATION_BUNDLE.zh-CN.md](</I:/autoteklasuanfa/DEFINITION_CLAUSE_DECISION_BRIDGE_VALIDATION_BUNDLE.zh-CN.md>)
+- 这一步把 mapper fixtures 和 effect-adapter fixtures 两条新验证链先收成了一个统一 bundle 入口，下一轮并回旧 bridge/fixture/sidecar 时可以优先围绕这个 bundle 做整合。
+- `2026-04-22` 已为 `EffectAdapter` 主链补上独立 artifact/workflow：
+  - [DefinitionClauseDecisionBridgeEffectAdapterFixtureArtifactModels.cs](</I:/autoteklasuanfa/src/TeklaBodyBracketRecognition.App/DefinitionClauseDecisionBridgeEffectAdapterFixtureArtifactModels.cs>)
+  - [DefinitionClauseDecisionBridgeEffectAdapterFixtureArtifactBuilder.cs](</I:/autoteklasuanfa/src/TeklaBodyBracketRecognition.App/DefinitionClauseDecisionBridgeEffectAdapterFixtureArtifactBuilder.cs>)
+  - [DefinitionClauseDecisionBridgeEffectAdapterFixtureArtifactSerializer.cs](</I:/autoteklasuanfa/src/TeklaBodyBracketRecognition.App/DefinitionClauseDecisionBridgeEffectAdapterFixtureArtifactSerializer.cs>)
+  - [DefinitionClauseDecisionBridgeEffectAdapterFixtureWorkflow.cs](</I:/autoteklasuanfa/src/TeklaBodyBracketRecognition.App/DefinitionClauseDecisionBridgeEffectAdapterFixtureWorkflow.cs>)
+  - [DEFINITION_CLAUSE_DECISION_BRIDGE_EFFECT_ADAPTER_FIXTURE_WORKFLOW.zh-CN.md](</I:/autoteklasuanfa/DEFINITION_CLAUSE_DECISION_BRIDGE_EFFECT_ADAPTER_FIXTURE_WORKFLOW.zh-CN.md>)
+- 这一步把 `EffectSnapshot -> tier -> verdict -> readiness` 主链也推进到了独立 JSON/Markdown 工件层，下一轮并回旧 bridge/fixture/sidecar 链时不需要再先补输出壳。
+- `2026-04-22` 已为 `EffectSnapshot -> RawInputs -> Tier -> Verdict` 主链补上最小 fixture / runner / report：
+  - [DefinitionClauseDecisionBridgeEffectAdapterFixtures.cs](</I:/autoteklasuanfa/src/TeklaBodyBracketRecognition.Core/Algorithms/DefinitionClauseDecisionBridgeEffectAdapterFixtures.cs>)
+  - [DefinitionClauseDecisionBridgeEffectAdapterFixtureRunner.cs](</I:/autoteklasuanfa/src/TeklaBodyBracketRecognition.Core/Algorithms/DefinitionClauseDecisionBridgeEffectAdapterFixtureRunner.cs>)
+  - [DefinitionClauseDecisionBridgeEffectAdapterFixtureReportBuilder.cs](</I:/autoteklasuanfa/src/TeklaBodyBracketRecognition.Core/Algorithms/DefinitionClauseDecisionBridgeEffectAdapterFixtureReportBuilder.cs>)
+- 当前新适配链已经能直接用 `GKZ / HXZ / GL / MJ / YPGL + synthetic broken` 夹具验证 `EffectSnapshot -> tier -> verdict -> readiness` 是否一致。
+- `2026-04-22` 已补上旧 bridge/effect 结果接回新 mapper 主链的适配层：
+  - [DefinitionClauseDecisionBridgeEffectSnapshot.cs](</I:/autoteklasuanfa/src/TeklaBodyBracketRecognition.Core/Algorithms/DefinitionClauseDecisionBridgeEffectSnapshot.cs>)
+  - [DefinitionClauseDecisionBridgeEffectAdapter.cs](</I:/autoteklasuanfa/src/TeklaBodyBracketRecognition.Core/Algorithms/DefinitionClauseDecisionBridgeEffectAdapter.cs>)
+  - [DEFINITION_CLAUSE_DECISION_BRIDGE_EFFECT_ADAPTER.zh-CN.md](</I:/autoteklasuanfa/DEFINITION_CLAUSE_DECISION_BRIDGE_EFFECT_ADAPTER.zh-CN.md>)
+- 这一步把下一轮“并回旧 bridge/effect 文件”的动作继续收薄成：`OldEffectResult -> EffectSnapshot -> RawInputs -> Context -> Result`。
+- `2026-04-22` 已为 bridge mapper 补上 raw-input 归一化入口：
+  - [DefinitionClauseDecisionBridgeTierModels.cs](</I:/autoteklasuanfa/src/TeklaBodyBracketRecognition.Core/Algorithms/DefinitionClauseDecisionBridgeTierModels.cs>)
+  - [DefinitionClauseDecisionBridgeMapper.cs](</I:/autoteklasuanfa/src/TeklaBodyBracketRecognition.Core/Algorithms/DefinitionClauseDecisionBridgeMapper.cs>)
+- 当前新增了 `DefinitionClauseDecisionBridgeRawInputs` 和 `Normalize(...) / Resolve*Tier(...)` 一组纯函数，下一轮只要把既有 bridge 或 effect 结果喂进 raw inputs，就能统一落成 `tier -> verdict` 主链。
+- `2026-04-22` 已为 bridge mapper fixture 层补上独立 artifact/workflow：
+  - [DefinitionClauseDecisionBridgeMapperFixtureArtifactModels.cs](</I:/autoteklasuanfa/src/TeklaBodyBracketRecognition.App/DefinitionClauseDecisionBridgeMapperFixtureArtifactModels.cs>)
+  - [DefinitionClauseDecisionBridgeMapperFixtureArtifactBuilder.cs](</I:/autoteklasuanfa/src/TeklaBodyBracketRecognition.App/DefinitionClauseDecisionBridgeMapperFixtureArtifactBuilder.cs>)
+  - [DefinitionClauseDecisionBridgeMapperFixtureArtifactSerializer.cs](</I:/autoteklasuanfa/src/TeklaBodyBracketRecognition.App/DefinitionClauseDecisionBridgeMapperFixtureArtifactSerializer.cs>)
+  - [DefinitionClauseDecisionBridgeMapperFixtureWorkflow.cs](</I:/autoteklasuanfa/src/TeklaBodyBracketRecognition.App/DefinitionClauseDecisionBridgeMapperFixtureWorkflow.cs>)
+  - [DEFINITION_CLAUSE_DECISION_BRIDGE_MAPPER_FIXTURE_WORKFLOW.zh-CN.md](</I:/autoteklasuanfa/DEFINITION_CLAUSE_DECISION_BRIDGE_MAPPER_FIXTURE_WORKFLOW.zh-CN.md>)
+- 这一步把新 mapper fixture 层从“可跑最小回归”推进到“可独立导出 JSON/Markdown artifact”，下一轮可以更顺地并回既有 sidecar/fixture 链。
+- `2026-04-22` 已为 bridge 纯函数骨架补上最小 fixture / runner / Markdown 报告层：
+  - [DefinitionClauseDecisionBridgeMapperFixtures.cs](</I:/autoteklasuanfa/src/TeklaBodyBracketRecognition.Core/Algorithms/DefinitionClauseDecisionBridgeMapperFixtures.cs>)
+  - [DefinitionClauseDecisionBridgeMapperFixtureRunner.cs](</I:/autoteklasuanfa/src/TeklaBodyBracketRecognition.Core/Algorithms/DefinitionClauseDecisionBridgeMapperFixtureRunner.cs>)
+  - [DefinitionClauseDecisionBridgeMapperFixtureReportBuilder.cs](</I:/autoteklasuanfa/src/TeklaBodyBracketRecognition.Core/Algorithms/DefinitionClauseDecisionBridgeMapperFixtureReportBuilder.cs>)
+- 当前 bridge 邻接层已经不只是纯函数，还具备了 `GKZ / HXZ / GL / MJ / YPGL + synthetic broken probe` 的最小回归入口，下一轮可以优先把它并到既有 fixture sidecar 链。
+- `2026-04-22` 已新增 bridge 邻接层的 tier/result/model + 纯函数映射骨架：
+  - [DefinitionClauseDecisionBridgeTierModels.cs](</I:/autoteklasuanfa/src/TeklaBodyBracketRecognition.Core/Algorithms/DefinitionClauseDecisionBridgeTierModels.cs>)
+  - [DefinitionClauseDecisionBridgeMapper.cs](</I:/autoteklasuanfa/src/TeklaBodyBracketRecognition.Core/Algorithms/DefinitionClauseDecisionBridgeMapper.cs>)
+- 这一步先把 `tier -> CandidateDirection -> ClauseVerdict -> ClausePromotionReadiness` 变成纯函数代码，下一轮可以把它并回既有 [DefinitionClauseDecisionBridge.cs](</I:/autoteklasuanfa/src/TeklaBodyBracketRecognition.Core/Algorithms/DefinitionClauseDecisionBridge.cs>) 和 fixture 链。
+- `2026-04-22` 已把 `DefinitionClause` 的升级规则继续收敛成 bridge 可直接实现的映射表：
+  - [DEFINITION_CLAUSE_DECISION_BRIDGE_MAPPING_TABLE.zh-CN.md](</I:/autoteklasuanfa/DEFINITION_CLAUSE_DECISION_BRIDGE_MAPPING_TABLE.zh-CN.md>)
+- 这一步把 `SourceTier / StationTier / TopologyTier / ProofCompletenessTier / LeadClauseTier`、`CandidateDirection`、`ClauseVerdict` 和 `ClausePromotionReadiness` 的表驱动映射都固定下来了，下一轮可以直接往 `DefinitionClauseDecisionBridge.cs` 落纯函数。
+- `2026-04-22` 已冻结 `DefinitionClause` 的证据优先级与降级规则：
+  - [DEFINITION_CLAUSE_DECISION_EVIDENCE_PRECEDENCE.zh-CN.md](</I:/autoteklasuanfa/DEFINITION_CLAUSE_DECISION_EVIDENCE_PRECEDENCE.zh-CN.md>)
+- 这一步把 `real_input / recognition_input`、站位稳定性、拓扑信号、证明完整度和 `LeadClauseShare` 的优先级全部固定下来，下一轮 bridge/helper 可以直接按统一层级生成 `ClauseVerdict / ClausePromotionReadiness`。
+- `2026-04-22` 已冻结阶段 5 -> 阶段 6 的 `DefinitionClause` 判定升级闸门：
+  - [DEFINITION_CLAUSE_DECISION_VERDICT_GATE.zh-CN.md](</I:/autoteklasuanfa/DEFINITION_CLAUSE_DECISION_VERDICT_GATE.zh-CN.md>)
+- 这一步先把 `ClauseVerdict / ClausePromotionReadiness` 的保守定义、升级必要条件、首轮样本落点和 promotion 门槛固定下来，避免下一轮直接在代码里临时拼 verdict。
+- `2026-04-22` 已完成本地 `worker` 分支清理：
+  - 已删除 `MAIN_BODY_LOCAL_WORKER*.md`、`tools/worker/` 和 `.worker/` 运行产物；
+  - [MAIN_BODY_REBUILD_STATUS.md](</I:/autoteklasuanfa/MAIN_BODY_REBUILD_STATUS.md>) 与 [MAIN_BODY_REBUILD_TASKLIST.zh-CN.md](</I:/autoteklasuanfa/MAIN_BODY_REBUILD_TASKLIST.zh-CN.md>) 已回到“只描述主材识别主线”的状态。
+
+- `2026-04-22` 新增真实结果接线契约与中间模型：
+  - [DEFINITION_CLAUSE_DECISION_REAL_SOURCE_CONTRACT.zh-CN.md](</I:/autoteklasuanfa/DEFINITION_CLAUSE_DECISION_REAL_SOURCE_CONTRACT.zh-CN.md>)
+  - [DefinitionClauseDecisionFullRunSourceModels.cs](</I:/autoteklasuanfa/src/TeklaBodyBracketRecognition.App/DefinitionClauseDecisionFullRunSourceModels.cs>)
+- 这一步先把“full-run 真实结果要保留哪些字段，才能进入 representative-part source / snapshot / sidecar”固定下来，避免后续继续在 [Program.cs](</I:/autoteklasuanfa/src/TeklaBodyBracketRecognition.App/Program.cs>) 里临时拼字段。
+- 当前最近的直接下一步：
+  - 把 `DefinitionClauseDecisionFullRunSourceModels` 接到 `Program.cs` 的 full-run 结果落盘点；
+  - 先生成一版真实 `representative-part source`；
+  - 再沿既有 `snapshot -> sidecar` 旁路跑通第一版真实链。
+- `2026-04-22` 又补齐了真实 source artifact 层：
+  - [DEFINITION_CLAUSE_DECISION_FULLRUN_SOURCE_ARTIFACT_CONTRACT.zh-CN.md](</I:/autoteklasuanfa/DEFINITION_CLAUSE_DECISION_FULLRUN_SOURCE_ARTIFACT_CONTRACT.zh-CN.md>)
+  - [DefinitionClauseDecisionFullRunSourceArtifactModels.cs](</I:/autoteklasuanfa/src/TeklaBodyBracketRecognition.App/DefinitionClauseDecisionFullRunSourceArtifactModels.cs>)
+  - [DefinitionClauseDecisionFullRunSourceArtifactBuilder.cs](</I:/autoteklasuanfa/src/TeklaBodyBracketRecognition.App/DefinitionClauseDecisionFullRunSourceArtifactBuilder.cs>)
+- 这一步把真实 `representative-part source` 自己的 JSON / Markdown 形态也固定下来了，因此下一轮接入 `Program.cs` 时，不会只生成中间对象，而会直接拥有：
+  - `definition-clause-decision-fullrun-source.json`
+  - `definition-clause-decision-fullrun-source.zh-CN.md`
+- `2026-04-22` 又补上了 fullrun-source 的 serializer 与 workflow：
+  - [DefinitionClauseDecisionFullRunSourceArtifactSerializer.cs](</I:/autoteklasuanfa/src/TeklaBodyBracketRecognition.App/DefinitionClauseDecisionFullRunSourceArtifactSerializer.cs>)
+  - [DEFINITION_CLAUSE_DECISION_FULLRUN_SOURCE_WORKFLOW.zh-CN.md](</I:/autoteklasuanfa/DEFINITION_CLAUSE_DECISION_FULLRUN_SOURCE_WORKFLOW.zh-CN.md>)
+- 这一步把 `fullrun-source artifact` 从“模型 + builder”推进到了“可直接落盘”的状态，下一轮接到 `Program.cs` 时不需要再临时补 serializer。
+- `2026-04-22` 又补上了 fullrun-source 的统一导出服务：
+  - [DefinitionClauseDecisionFullRunSourceExportResult.cs](</I:/autoteklasuanfa/src/TeklaBodyBracketRecognition.App/DefinitionClauseDecisionFullRunSourceExportResult.cs>)
+  - [DefinitionClauseDecisionFullRunSourceExportService.cs](</I:/autoteklasuanfa/src/TeklaBodyBracketRecognition.App/DefinitionClauseDecisionFullRunSourceExportService.cs>)
+  - [DEFINITION_CLAUSE_DECISION_FULLRUN_SOURCE_EXPORT_QUICKSTART.zh-CN.md](</I:/autoteklasuanfa/DEFINITION_CLAUSE_DECISION_FULLRUN_SOURCE_EXPORT_QUICKSTART.zh-CN.md>)
+- 这一步把下一轮接到 `Program.cs` 的动作继续收薄成“收集 source rows 后调用一个 Export(...)”，不再需要在主流程里重复拼文件名、编码和 Markdown 输出顺序。
+- `2026-04-22` 又补上了 fullrun-source 的 validation 层：
+  - [DefinitionClauseDecisionFullRunSourceValidationResult.cs](</I:/autoteklasuanfa/src/TeklaBodyBracketRecognition.App/DefinitionClauseDecisionFullRunSourceValidationResult.cs>)
+  - [DefinitionClauseDecisionFullRunSourceValidator.cs](</I:/autoteklasuanfa/src/TeklaBodyBracketRecognition.App/DefinitionClauseDecisionFullRunSourceValidator.cs>)
+  - [DefinitionClauseDecisionFullRunSourceValidationReportBuilder.cs](</I:/autoteklasuanfa/src/TeklaBodyBracketRecognition.App/DefinitionClauseDecisionFullRunSourceValidationReportBuilder.cs>)
+  - [DefinitionClauseDecisionFullRunSourceValidationSerializer.cs](</I:/autoteklasuanfa/src/TeklaBodyBracketRecognition.App/DefinitionClauseDecisionFullRunSourceValidationSerializer.cs>)
+  - [DEFINITION_CLAUSE_DECISION_FULLRUN_SOURCE_VALIDATION.zh-CN.md](</I:/autoteklasuanfa/DEFINITION_CLAUSE_DECISION_FULLRUN_SOURCE_VALIDATION.zh-CN.md>)
+- 现在 fullrun-source 不只会导出 `.json/.md`，还会额外导出：
+  - `definition-clause-decision-fullrun-source-validation.json`
+  - `definition-clause-decision-fullrun-source-validation.md`
+- `2026-04-22` 又补上了 fullrun-source 的 manifest / README 层：
+  - [DefinitionClauseDecisionFullRunSourceManifest.cs](</I:/autoteklasuanfa/src/TeklaBodyBracketRecognition.App/DefinitionClauseDecisionFullRunSourceManifest.cs>)
+  - [DefinitionClauseDecisionFullRunSourceManifestSerializer.cs](</I:/autoteklasuanfa/src/TeklaBodyBracketRecognition.App/DefinitionClauseDecisionFullRunSourceManifestSerializer.cs>)
+  - [DefinitionClauseDecisionFullRunSourceReadmeBuilder.cs](</I:/autoteklasuanfa/src/TeklaBodyBracketRecognition.App/DefinitionClauseDecisionFullRunSourceReadmeBuilder.cs>)
+  - [DEFINITION_CLAUSE_DECISION_FULLRUN_SOURCE_OUTPUT_README.zh-CN.md](</I:/autoteklasuanfa/DEFINITION_CLAUSE_DECISION_FULLRUN_SOURCE_OUTPUT_README.zh-CN.md>)
+- 现在 fullrun-source 导出目录除了工件和校验文件，还会自带：
+  - `definition-clause-decision-fullrun-source-manifest.json`
+  - `README.md`
+- `2026-04-22` 又把 fullrun-source 收成统一 workflow：
+  - [DefinitionClauseDecisionFullRunSourceWorkflowResult.cs](</I:/autoteklasuanfa/src/TeklaBodyBracketRecognition.App/DefinitionClauseDecisionFullRunSourceWorkflowResult.cs>)
+  - [DefinitionClauseDecisionFullRunSourceWorkflow.cs](</I:/autoteklasuanfa/src/TeklaBodyBracketRecognition.App/DefinitionClauseDecisionFullRunSourceWorkflow.cs>)
+  - [DEFINITION_CLAUSE_DECISION_FULLRUN_SOURCE_WORKFLOW_ENTRY.zh-CN.md](</I:/autoteklasuanfa/DEFINITION_CLAUSE_DECISION_FULLRUN_SOURCE_WORKFLOW_ENTRY.zh-CN.md>)
+- 这一步把下一轮 `Program.cs` 接线进一步收薄成“收集 source rows 后调一次 workflow”，主流程不需要再直接知道 fullrun-source 这一层到底写了几个文件。
+- `2026-04-22` 又把 fullrun-source 的 collector 固定下来了：
+  - [DefinitionClauseDecisionFullRunSourceCollector.cs](</I:/autoteklasuanfa/src/TeklaBodyBracketRecognition.App/DefinitionClauseDecisionFullRunSourceCollector.cs>)
+  - [DEFINITION_CLAUSE_DECISION_FULLRUN_SOURCE_COLLECTOR.zh-CN.md](</I:/autoteklasuanfa/DEFINITION_CLAUSE_DECISION_FULLRUN_SOURCE_COLLECTOR.zh-CN.md>)
+- 这一步把下一轮真正接入 [Program.cs](</I:/autoteklasuanfa/src/TeklaBodyBracketRecognition.App/Program.cs>) 的动作继续收薄成：
+  - 主循环结束后调 `CollectAssemblies(...)`
+  - 再调 `CollectRepresentativeParts(...)`
+  - 最后把结果喂给 `DefinitionClauseDecisionFullRunSourceWorkflow.Run(...)`
+- `2026-04-22` 已把 fullrun-source 真正接入 [Program.cs](</I:/autoteklasuanfa/src/TeklaBodyBracketRecognition.App/Program.cs>) 的结果落盘链：
+  - 当前会直接利用已累积的 `bodyMaterialSummaries + realInputCoreBodyProof` 调用：
+    - `DefinitionClauseDecisionFullRunSourceCollector.CollectAssemblies(...)`
+    - `DefinitionClauseDecisionFullRunSourceCollector.CollectRepresentativeParts(...)`
+    - `DefinitionClauseDecisionFullRunSourceWorkflow.Run(...)`
+  - 这意味着第一版真实 `definition-clause-decision-fullrun-source*.json/.md` 工件路径已经进入应用主流程，而不再只是外围脚手架。
+- `2026-04-22` 已开始固定 `fullrun-source -> snapshot` 适配面：
+  - [DEFINITION_CLAUSE_DECISION_FULLRUN_SNAPSHOT_BRIDGE.zh-CN.md](</I:/autoteklasuanfa/DEFINITION_CLAUSE_DECISION_FULLRUN_SNAPSHOT_BRIDGE.zh-CN.md>)
+  - [DefinitionClauseDecisionFullRunSnapshotSeedModels.cs](</I:/autoteklasuanfa/src/TeklaBodyBracketRecognition.App/DefinitionClauseDecisionFullRunSnapshotSeedModels.cs>)
+- 这一步的目的不是提前给最终 verdict，而是先把 fullrun-source 进入 snapshot 前的稳定字段面固定下来，避免后续直接把复杂 full-run 对象硬塞进既有 snapshot 链。
+
+## 当前已知关键问题
+
+1. 当前 `BodyRecognizer` 仍然使用启发式投票，不符合新的严格定义。
+2. 合成主体仍参与主材判定，容易混淆真实零件与虚拟零件。
+3. 尚未实现“稳定截面 -> 主轮廓 -> 主材证明”链路。
+4. `T3-1HXZ-1` 一类边界样本已证明当前主体识别基座不稳。
+5. `body-candidate-partition.json` 的首版已经能把耳板 / 端板 / 小件下沉，但对 `SynthesizedBody=true` 的样本，分层器当前看到的仍然是“虚拟主体 + 部分真实件”；例如 `T3-1HXZ-1` 里，真实主板 `29616986` 不在当前分层输入中，这说明后续需要把“真实主材分层”与“导入虚拟主体识别”进一步解耦。
+6. 已完成双视图分层输出：
+   - `body-candidate-partition-recognition-input.json`
+   - `body-candidate-partition-real-input.json`
+   - `body-candidate-partition-summary.zh-CN.md`
+   并已在 `run_body_bracket_real_04_contract_v5` 证明：`T3-1HXZ-1` 的真实主零件 `29616986` 在 `real_input` 中已回到 `body_candidate`，而在 `recognition_input` 中仍缺失。
+7. 阶段 3 首版原型已在 `run_body_bracket_real_04_contract_v7` 跑通，并已证明：`T3-1HXZ-1` 的 `real_input` 视图下，端部修剪段已不再被误标成稳定区；当前结果为“两端 end_complex + 中部 local_complex”，尚无可直接用于主截面证明的稳定区。
+8. 阶段 4 首版最小原型已在 `section-trace-stage4-smoke` 跑通，并已证明：
+   - `GKZ` 样本的 `real_input` 视图下，已能提取稳定站位上的持续真实零件迹线；
+   - `recognition_input` 视图下，合成主体样本仍会出现“主导迹线被虚拟件吞没”的现象；
+   - `GL` 类样本里仍存在 `NO_BODY_CANDIDATE_SEGMENTS / BODY_CANDIDATE_GAPS_ON_PRIORITY_STATIONS`，说明阶段 2/3 对真实主材候选的覆盖率还不稳。
+9. 已在 `section-trace-stage4-smoke-v6` 修正 `GL` 类样本的阶段 2/3 基座问题，并已证明：
+   - 零几何 `PolyBeam` 不再污染主体长度估计；
+   - `inputMainPart` 所在连通分量之外的远端同 profile 长板，已不再混入当前构件的主体候选；
+   - `T2-3GL-22 / T2-3GL-53` 的 `real_input` 视图下，优先站位 `Priority Body Coverage` 已从 `0.00` 回到 `1.00`；
+   - 两个样本都已重新出现稳定区与 body_candidate 迹线，但仍未进入真正的 `trace cleaning / envelope / closed-loop` 阶段。
+10. 已在 `run_body_bracket_real_04_contract_v10` 完成阶段 4.5 的 `trace cleaning + topology` 旁路验证，并已证明：
+   - `section-trace-cleaning-*.json` 已能把一批短噪声线压到 `SHORT_TRACE`；
+   - `section-topology-*.json` 已能输出 `retained / suppressed / outer envelope / internal trace / closed-loop candidate` 五类证据；
+   - 这一步仍是最小拓扑旁路，不等于最终家族判定。
+11. 已在 `run_body_bracket_real_04_contract_v11` 启动阶段 5 bootstrap，并已证明：
+   - `core-body-proof-*.json` 已能基于 `priority station 持续性 + 外包络支撑` 提取首版核心件候选；
+   - `T3-1HXZ-1` 当前被拆成“四块 `PL30*40` 进入 `CoreBodyPartIds`，`29616986` 进入 `ReviewPartIds`”，这正是后续完整 `remove-and-recompute` 的优先验证对象；
+   - 当前还不是最终主体核心证明，只是阶段 5 的 bootstrap 输入层。
+12. 已在 `run_body_bracket_real_04_contract_v14` 把阶段 5 bootstrap 推到“带扰动指标”的版本，并已证明：
+   - `CoreBodyProofPartResult` 已新增 `PriorityBodyCoverageAfterRemovalRatio / ClosedLoopStationCountAfterRemoval / BodyWidthRetentionRatio / RemovalImpactScore`；
+   - `core-body-proof-summary.zh-CN.md` 已新增“主件扰动命中样本”小节；
+   - `T3-1HXZ-1` 现在已把 `29616986` 作为“输入主件 + 扰动证据命中”的核心候选拉回 `CoreBodyPartIds`，而四块 `PL30*40` 暂留在 `ReviewPartIds`；
+   - 这说明阶段 5 已开始具备“主件去掉后主体证据塌缩”的最小判别能力，但仍未完成真正的 `remove-and-recompute`。
+13. 已在 `run_body_bracket_real_04_contract_v16` 修正阶段 4 的截面迹线方向选择，并已证明：
+   - `GKZ` 四块主壁板的 `PL16*1050 / PL16*1018` 现在都会按长边输出到截面迹线；
+   - `CoreBodyProofEngine` 新增 `MAIN_PART_PEER_GROUP_PROMOTION` 后，`T3-1GKZ-1` 一类样本已从“只有输入主件进 core”收敛到“四块主壁板一起进 core”；
+   - `HXZ` 一类样本没有被这条 grouped peer promotion 误升。
+14. 已在 `run_body_bracket_real_04_contract_v17` 把阶段 5 推进到“真正按站位 remove-and-recompute”的过渡版，并已证明：
+   - `CoreBodyProofPartResult` 已新增 `PriorityStationsWithEnvelopeBodyCandidateAfterRemoval / EnvelopeBodyCoverageAfterRemovalRatio / LostBodyCoverageStationIds / LostEnvelopeSupportStationIds / LostClosedLoopStationIds`；
+   - `core-body-proof-summary.zh-CN.md` 已新增“移除后站位退化样本”小节；
+   - 当前系统已经能回答：去掉某零件后，哪些优先站位会失去 `body coverage / envelope support / closed-loop`；
+   - `GKZ` 四块主壁板在这版 remove-and-recompute 下依然稳定留在 `CoreBodyPartIds`，`T3-1HXZ-1` 仍保持“29616986 进 core、四块 PL30*40 留 review”的保守状态。
+15. 已在 `run_body_bracket_real_04_contract_v18` 清理阶段 5 摘要噪声，并已证明：
+   - `core-body-proof-summary.zh-CN.md` 的“主件扰动命中样本 / 移除后站位退化样本”已经不再被单主件、零 peer 的样本刷屏；
+   - 当前代表输出开始聚焦于真正存在主体边界问题的 `GKL / GL / YPGL / HXZ / GKZ` 样本；
+   - `v18` 现在可作为阶段 5 的干净 review 基线继续往下迭代。
+16. 已在 `run_body_bracket_real_04_contract_v19` 把“主轮廓拓扑改写 / 关键尺寸换主导”补成结构化证据，并已证明：
+   - `CoreBodyProofPartResult` 已新增 `TopologyRewriteStationIds / DominantDimensionSwitchStationIds`；
+   - `core-body-proof-summary.zh-CN.md` 的“移除后站位退化样本”已开始展示 `TopologyRewrite / DominantSwitch`；
+   - 这一步先以旁路证据落地，没有直接并入阶段 5 分数。
+17. 已在 `run_body_bracket_real_04_contract_v20` 收紧“关键尺寸换主导”信号，并已证明：
+   - “删掉当前主导板后主导当然变化”这类必然事件，已经不再计入 `DominantDimensionSwitchStationIds`；
+   - `GKZ` 四块主壁板当前主要保留的是 `TopologyRewriteStationIds`，而不会再被 `DominantSwitch` 噪声刷屏；
+   - `v20` 现在可作为阶段 5.5 的更干净 review 基线。
+18. 已在 `run_body_bracket_real_04_contract_v21` 调整阶段 5 摘要排序，并已证明：
+   - “移除后站位退化样本”现在优先展示 `LostClosedLoop / TopologyRewrite` 命中样本；
+   - review 入口开始从“分数高”转向“证据更硬”的样本排序。
+19. 已在 `run_body_bracket_real_04_contract_v22` 收紧 `TopologyRewriteStationIds` 的旁路边界，并已证明：
+   - 已失去 `body coverage / envelope support / closed-loop` 的站位，不再重复记入 `TopologyRewrite`；
+   - `TopologyRewrite` 开始更接近“剩余主体仍存在，但控制结构被改写”的补充证据。
+20. 已在 `run_body_bracket_real_04_contract_v24` 把 `TopologyRewrite` 再收紧到“工程意义门槛后”的版本，并已证明：
+   - 只有基线站位本身具备 `closed-loop` 或至少 `3` 条主体控制迹线时，才会把“包络主导关系/关键跨度改写”记成 `TopologyRewrite`；
+   - `real_input` 里命中 `TopologyRewrite` 的零件数已从 `v22` 的 `187` 降到 `v24` 的 `66`；
+   - 当前 `TopologyRewrite` 样本已明显收敛到 `GKZ / HXZ` 这类真正值得复核的主体边界样本。
+21. 已在 `run_body_bracket_real_04_contract_v25` 把“主截面改写样本”单独挂到摘要里，并已证明：
+   - 阶段 5 摘要不再只能从 `LostClosedLoop` 大表里翻 `TopologyRewrite`；
+   - 当前 `GKZ / HXZ` 命中的主截面改写样本，已能作为独立 review 入口直接查看。
+22. 已在 `run_body_bracket_real_04_contract_v26` 把 `TopologyRewrite` 从“一个总桶”拆成三类结构化原因，并已证明：
+   - `TopologyRewriteSpanYStationIds`
+   - `TopologyRewriteSpanZStationIds`
+   - `TopologyRewriteEnvelopeControllerSwitchStationIds`
+   当前 `GKZ` 主壁板样本主要体现为 `SpanYRewrite + ControllerSwitch`，而不是 `SpanZRewrite`。
+23. 已在 `run_body_bracket_real_04_contract_v27` 新增独立摘要 `topology-rewrite-summary.zh-CN.md`，并已证明：
+   - 当前 `TopologyRewrite` 已有单独的构件级聚合入口；
+   - 代表零件的 `SpanYRewrite / SpanZRewrite / ControllerSwitch` 原因也能单独展开；
+   - 这让后续围绕 `GKZ / HXZ` 继续收紧阶段 5 时，不再需要直接翻原始 `core-body-proof-real-input.json`。
+24. 已在 `run_body_bracket_real_04_contract_v28` 把 `TopologyRewrite` 模式标签固化进结果模型，并已证明：
+   - `CoreBodyProofPartResult` 已新增 `TopologyRewritePatternCode / TopologyRewritePatternLabelZh`；
+   - 当前 `GKZ` 主壁板样本已稳定表现为 `SPAN_Y_PLUS_CONTROLLER`；
+   - 当前 `HXZ` 主板样本已稳定表现为 `SPAN_Z_PLUS_CONTROLLER`；
+   - 配套脚本 [Build-TopologyRewriteSummary.ps1](</I:/autoteklasuanfa/tools/Build-TopologyRewriteSummary.ps1>) 已能稳定重建这份摘要，不再依赖应用内这条异常的独立落盘链。
+25. 已在 `run_body_bracket_real_04_contract_v29` 把 `TopologyRewrite` 摘要正式接进 review 工作流，并已证明：
+   - [Run-OfflineRecognition.ps1](</I:/autoteklasuanfa/tools/Run-OfflineRecognition.ps1>) 现在会在离线识别完成后自动补写 `topology-rewrite-summary.zh-CN.md`；
+   - [Build-ReviewArtifacts.ps1](</I:/autoteklasuanfa/tools/Build-ReviewArtifacts.ps1>) 现在会把 `TopologyRewriteSummary` 一并产出到结果目录；
+   - [Build-TopologyRewriteSummary.ps1](</I:/autoteklasuanfa/tools/Build-TopologyRewriteSummary.ps1>) 已重写成 WinPS 兼容版本，修掉了 `UTF-8/Markdown 反引号/Sort-Object/Measure-Object` 这几类脚本链解析与运行时问题；
+   - `run_body_bracket_real_04_contract_v29` 已能稳定生成正确的 `Topology Rewrite Summary`，当前构件级聚合前几条已正确表现为 `T3-2MJ-10 / T3-2MJ-12 / T3-1GKZ-10 / T3-1GKZ-11 / T3-1GKZ-9`。
+26. 已在 `run_body_bracket_real_04_contract_v29 / v30` 收紧 review 与打包链的空 `P1` 行为，并已证明：
+   - `real_04` 这类不命中旧 `P1` 子集的结果目录，不会再因为空 `priority-bracket-answers.p1.csv` 直接打断 review 流；
+   - [Publish-TestablePackage.ps1](</I:/autoteklasuanfa/tools/Publish-TestablePackage.ps1>) 现在会把 `Build-TopologyRewriteSummary.ps1` 与 `results\\topology-rewrite-summary.zh-CN.md` 一起带进交付包，并对空 `P1 / BuiltUpT` 小包改为“有数据才重建”；
+   - 交付包 [tekla-body-bracket-testable-v29-topology](</I:/autoteklasuanfa/.deliverables/tekla-body-bracket-testable-v29-topology/README.md>) 已实跑通过，包内 `results\\topology-rewrite-summary.zh-CN.md` 与工作区结果一致；
+   - `run_body_bracket_real_04_contract_v30` 已完成端到端冒烟：`Run-OfflineRecognition.ps1 -SkipBuild -GenerateReviewQueue` 全链路退出码为 `0`，并已自动写出 `review-queue.csv + topology-rewrite-summary.zh-CN.md`。
+27. 已在 `run_body_bracket_real_04_contract_v31` 把 `ControllerRole` 正式接进阶段 5 解释层，并已证明：
+   - `CoreBodyProofPartResult` 已新增 `TopologyRewriteDirectControllerStationIds / TopologyRewriteIndirectControllerStationIds / TopologyRewriteControllerRoleCode / LabelZh`；
+   - `GKZ / HXZ` 当前都稳定表现为“被删零件本身就是主包络控制件”，说明这层证据能回答“是不是直接控制件”，但还不足以把两类样本真正拉开；
+   - 因此后续需要继续补“单主板 / 成对主板 / 多板簇”的主体板组角色，而不能只停在 `ControllerRole`。
+28. 已在 `run_body_bracket_real_04_contract_v32` 把阶段 5 继续推进到“主体板组角色”层，并已证明：
+   - `CoreBodyProofPartResult` 已新增 `TopologyRewriteCohortPartIds / TopologyRewriteCohortPartCount / TopologyRewriteShapeRoleCode / LabelZh`；
+   - 当前 `GKZ` 主壁板样本已稳定表现为：`SPAN_Y_PLUS_CONTROLLER + DIRECT_ENVELOPE_CONTROLLER + PAIRED_BODY_PLATE_REWRITE`；
+   - 当前 `HXZ` 主板样本已稳定表现为：`SPAN_Z_PLUS_CONTROLLER + DIRECT_ENVELOPE_CONTROLLER + SINGLE_PRIMARY_BODY_PLATE_REWRITE`；
+   - 这说明阶段 5 已经不只是“Y/Z 轴向模式”，而是开始具备“成对主壁板改写 vs 单主板改写”的主体角色解释；
+   - `topology-rewrite-summary.zh-CN.md` 与 `core-body-proof-summary.zh-CN.md` 现在都已同步展示 `ShapeRole + CohortParts`，可直接复核哪几块主体板一起构成改写模式。
+29. 已在 `run_body_bracket_real_04_contract_v33` 把阶段 5 再推进到“家族证明风险提示”层，并已证明：
+   - `CoreBodyProofPartResult` 已新增 `TopologyRewriteFamilyRiskCode / LabelZh`；
+   - 当前 `GKZ` 主壁板样本已稳定表现为：`成对主壁板系统改写风险`；
+   - 当前 `HXZ` 主板样本已稳定表现为：`单主板系统改写风险`；
+   - 这说明阶段 5 已开始从“主体板组角色”进入“更接近家族证明风险”的解释层，但仍然没有越界成最终家族标签；
+   - `topology-rewrite-summary.zh-CN.md` 与 `core-body-proof-summary.zh-CN.md` 现在都能同时展示 `Pattern + ControllerRole + ShapeRole + FamilyRisk`。
+30. 已将 `v33` 的 `FamilyRisk` 结果同步进交付链，并已证明：
+   - 新交付包 [tekla-body-bracket-testable-v33-familyrisk](</I:/autoteklasuanfa/.deliverables/tekla-body-bracket-testable-v33-familyrisk/README.md>) 已重打通过；
+   - 包内 `results\\topology-rewrite-summary.zh-CN.md` 已能稳定展示 `ControllerRoles / ShapeRoles / FamilyRisks / Patterns` 四层聚合；
+   - 当前 `v33` 不只是工作区结果已更新，交付包本身也已具备“成对主壁板系统改写风险 / 单主板系统改写风险”的可复核入口。
+31. 已在 `run_body_bracket_real_04_contract_v34` 把阶段 5 再推进到“主轮廓证明对象”层，并已证明：
+   - `CoreBodyProofPartResult` 已新增 `TopologyRewriteProofTypeCode / LabelZh`；
+   - 当前 `GKZ` 主壁板样本已稳定表现为：`成对主壁板主轮廓证明`；
+   - 当前 `HXZ` 主板样本已稳定表现为：`单主板主轮廓证明`；
+   - `core-body-proof-summary.zh-CN.md` 与 `topology-rewrite-summary.zh-CN.md` 现在都已能同时展示 `Pattern + ControllerRole + ShapeRole + FamilyRisk + ProofType`；
+   - 这说明阶段 5 已经从“控制结构变化 / 家族风险提示”继续推进到了“更像哪一类主轮廓证明对象被改写”的解释层，但仍未越界成最终家族标签。
+32. 已在 `run_body_bracket_real_04_contract_v35` 把阶段 5 再推进到“家族证明目标”层，并已证明：
+   - `CoreBodyProofPartResult` 已新增 `TopologyRewriteFamilyProofTargetCode / LabelZh`；
+   - 当前 `GKZ` 主壁板样本已稳定表现为：`箱型对壁闭合证明目标`；
+   - 当前 `HXZ` 主板样本已稳定表现为：`单主板体系待定目标`；
+   - `topology-rewrite-summary.zh-CN.md` 与 `core-body-proof-summary.zh-CN.md` 现在都已能同时展示 `Pattern + ControllerRole + ShapeRole + FamilyRisk + ProofType + FamilyProofTarget`；
+   - 这说明阶段 5 已经开始从“风险 / 证明对象”继续推进到“下一步最该拿哪一类家族定义去验证”的解释层，但仍未越界成最终家族标签。
+33. 已在 `section-trace-stage5-definition-clause-smoke-v2` 将阶段 5 的 `DefinitionClause` 结果模型正式接入摘要链与 review 链，并已证明：
+   - `CoreBodyProofPartResult` 已新增 `TopologyRewriteDefinitionClauseCode / LabelZh`；
+   - `topology-rewrite-summary.zh-CN.md`、`core-body-proof-summary.zh-CN.md` 与 [Build-TopologyRewriteSummary.ps1](</I:/autoteklasuanfa/tools/Build-TopologyRewriteSummary.ps1>) 现在都已能同时展示 `Pattern + ControllerRole + ShapeRole + FamilyRisk + ProofType + FamilyProofTarget + DefinitionClause`；
+   - 阶段 5 当前已经不只是在说“下一步该看哪类家族定义”，而是开始回答“更像哪一条定义条款正在被触发 / 破坏”，例如当前烟测里：
+     - `GKZ` 已稳定命中 `箱型：闭合/对边稳定条款`
+     - `GL` 已出现 `主体板：多数站位持续性条款 / 主板：多数站位持续性条款 / 箱型：闭合/对边稳定条款` 的分化提示
+   - `HXZ` 的 `DefinitionClause` 仍待下一轮 full-run 复核，不在本轮 smoke 结论内；
+   - 这一步仍然是定义级提示层，不等于最终 `H / BOX / T` 家族结论。
+34. 已在 `run_body_bracket_real_04_contract_v36` 完成 `DefinitionClause` 的 full-run 复核，并已证明：
+   - `v35 -> v36` 在 `205` 个 assembly 上，`bracket total / positive assemblies / max bracket count / body family changes` 全部保持不变；
+   - `run-comparison.md`、`body-change-summary.md`、`review-queue.csv` 与 `priority-review-pack.md` 均已正常产出，且 `body-change-summary.md` 仍为 `0` 组变化，说明这轮阶段 5 扩展没有打坏现有 review 链；
+   - 当前 full-run 的 `review-queue.csv` 仍只保留 `6` 个 `BuiltUpH` 正例，全部来自 `GKZ`，`priority-review-pack.md` 也仍只收敛到 `3` 组 bracket representatives；
+   - 当前命中 `TopologyRewrite` 的 `GKZ` 样本已稳定落在 `箱型：闭合/对边稳定条款`，`HXZ` 样本也已在 full-run 下稳定落在 `主板：多数站位持续性条款`；
+   - 这说明阶段 5 现在已经不只是“烟测里看起来合理”，而是完成了真实样本 full-run 下的条款级复核，可以开始从“条款提示存在”继续收紧到“条款满足 / 破坏门槛”。
+35. 已在 `v36` 摘要链补上“主条款稳定度 / 混合度”证据，并已证明：
+   - [Program.cs](</I:/autoteklasuanfa/src/TeklaBodyBracketRecognition.App/Program.cs>) 与 [Build-TopologyRewriteSummary.ps1](</I:/autoteklasuanfa/tools/Build-TopologyRewriteSummary.ps1>) 现在都会额外输出 `LeadClause / LeadClauseShare / ClauseMix`；
+   - 当前 `MJ` 这类多板簇控制改写样本已能直接表现为 `24/24 (100%) / 单条款稳定`；
+   - 当前 `GL` 这类混合改写样本已能直接表现为 `4/6 (67%) / 主条款占优，但仍属混合改写`；
+   - 当前 `YPGL` 这类“部分零件已有条款、部分零件仍未定”的样本已能直接表现为 `4/6 (67%) / 主条款占优，但仍有未定零件`；
+   - 当前 `HXZ / GKZ` 这类已落稳样本则会继续表现为 `5/5 (100%) / 单条款稳定` 与 `10/10, 14/14 (100%) / 单条款稳定`，说明这层摘要能把“条款已落稳”和“仍需继续解释的混合改写”直接拉开。
+
+## 脚本链稳定性补充
+
+- 已继续收敛 `v36` 的脚本链与包链稳定性，并已完成这两条基础修复：
+  - [Build-TopologyRewriteSummary.ps1](</I:/autoteklasuanfa/tools/Build-TopologyRewriteSummary.ps1>) 已切到 WinPS 可稳定解析的带 BOM UTF-8 版本，不再因为 `DefinitionClause` 中文文案触发 `powershell.exe -File` 解析失败。
+  - [Smoke-TestReviewFlows.ps1](</I:/autoteklasuanfa/tools/Smoke-TestReviewFlows.ps1>) 已改成“按实际存在且非空的答案表逐个跑”，不再把缺失或空的 `priority-bracket-answers.p1.csv / priority-bracket-answers.p1.builtupt-first.csv` 误判成整包失败。
+- 这意味着后续 `real_04 / v36` 一类没有旧 `P1 / BuiltUpT` 子流输入的交付包，也能继续沿当前 `DefinitionClause` 结果作为主 review 入口，而不会被历史 smoke gate 卡死。
+- 已在 `run_body_bracket_real_04_contract_v37` 把阶段 5 继续推进到“定义条款效果”层，并已证明：
+  - `CoreBodyProofPartResult` 已新增 `TopologyRewriteDefinitionClauseEffectCode / LabelZh`；
+  - `topology-rewrite-summary.zh-CN.md` 与 `core-body-proof-summary.zh-CN.md` 现在都已能同时展示 `DefinitionClauseEffect`、`主条款效果 / 主条款效果占比 / 条款效果混合度`；
+  - `v36 -> v37` 在 `205` 个 assembly 上，`bracket total / positive assemblies / max bracket count / body family changes` 仍全部保持不变；
+  - 当前 `GKZ` 已稳定表现为 `箱型：移除此件会改写对边稳定控制`；
+  - 当前 `HXZ` 已稳定表现为 `主板：移除此件会改写多数站位持续性`；
+  - 当前 `GL` 混合样本已能直接看出“主板持续性改写”与“箱型对边稳定控制改写”的混合效果；
+  - 当前 `MJ` 已稳定表现为 `多板簇：此件更像直接控制件，不能直接排除`；
+  - 当前 `YPGL` 代表样本已稳定表现为 `包络控制：移除此件会触发控制重分配`。
+
+## 当前下一步
+
+- 已新增桥接设计文档 [DEFINITION_CLAUSE_DECISION_BRIDGE_DESIGN.zh-CN.md](./DEFINITION_CLAUSE_DECISION_BRIDGE_DESIGN.zh-CN.md)，用于把 `DefinitionClauseEffect` 再推进到 `ClauseVerdict / ClausePromotionReadiness`。
+- 已新增独立 helper [DefinitionClauseDecisionBridge.cs](./src/TeklaBodyBracketRecognition.Core/Algorithms/DefinitionClauseDecisionBridge.cs)，先把 `ClauseVerdict / ClausePromotionReadiness` 的纯函数映射骨架落盘，后续再接入 `CoreBodyProofEngine`。
+- 已新增预期样本清单 [DEFINITION_CLAUSE_DECISION_EXPECTED_CASES.zh-CN.md](./DEFINITION_CLAUSE_DECISION_EXPECTED_CASES.zh-CN.md)，约束 `GKZ / HXZ / MJ / GL / YPGL` 五类样本在接线后的首轮回归落点。
+- 已新增聚合 helper [DefinitionClauseDecisionAggregate.cs](./src/TeklaBodyBracketRecognition.Core/Algorithms/DefinitionClauseDecisionAggregate.cs)，用于后续在摘要层稳定生成 `LeadClauseVerdict / LeadClausePromotionReadiness`。
+- 已新增接线计划 [DEFINITION_CLAUSE_DECISION_WIRING_PLAN.zh-CN.md](./DEFINITION_CLAUSE_DECISION_WIRING_PLAN.zh-CN.md)，把下一轮实现步骤固定成“引擎 -> 结果模型 -> 摘要 -> 脚本 -> full-run”。
+- 已新增输出契约 [DEFINITION_CLAUSE_DECISION_OUTPUT_CONTRACT.zh-CN.md](./DEFINITION_CLAUSE_DECISION_OUTPUT_CONTRACT.zh-CN.md)，固定 `ClauseVerdict / ClausePromotionReadiness` 的字段名、中文文案和聚合列。
+- 已新增摘要模型 [DefinitionClauseDecisionSummaryModels.cs](./src/TeklaBodyBracketRecognition.App/DefinitionClauseDecisionSummaryModels.cs)，为后续 `Program.cs` 接线准备代表零件/构件级聚合行模型。
+- 已新增呈现 helper [DefinitionClauseDecisionPresentation.cs](./src/TeklaBodyBracketRecognition.App/DefinitionClauseDecisionPresentation.cs)，统一输出 `ClauseVerdict` 的 review 提示和 Markdown 表格，避免后续在 `Program.cs` 与脚本里各写一套中文判断。
+- 已新增夹具集 [DefinitionClauseDecisionBridgeFixtures.cs](./src/TeklaBodyBracketRecognition.Core/Algorithms/DefinitionClauseDecisionBridgeFixtures.cs)，把 `GKZ / HXZ / MJ / GL / YPGL` 的预期落点固化成代码级样例。
+- 已新增最小 runner [DefinitionClauseDecisionBridgeFixtureRunner.cs](./src/TeklaBodyBracketRecognition.Core/Algorithms/DefinitionClauseDecisionBridgeFixtureRunner.cs)，后续接线前后都能先跑一遍 fixture 检查桥接映射是否偏移。
+- 已新增 sidecar 结果模型 [DefinitionClauseDecisionArtifactModels.cs](./src/TeklaBodyBracketRecognition.App/DefinitionClauseDecisionArtifactModels.cs) 与构建器 [DefinitionClauseDecisionArtifactBuilder.cs](./src/TeklaBodyBracketRecognition.App/DefinitionClauseDecisionArtifactBuilder.cs)，后续可以先独立落 `definition-clause-decision-summary.zh-CN.md`，再逐步并回主摘要。
+- 已新增 sidecar 摘要脚本 [Build-DefinitionClauseDecisionSummary.ps1](./tools/Build-DefinitionClauseDecisionSummary.ps1)，后续只要先落 `definition-clause-decision-summary.json`，就能独立重建 `definition-clause-decision-summary.zh-CN.md`。
+- 已新增 sidecar 契约 [DEFINITION_CLAUSE_DECISION_SIDECAR_CONTRACT.zh-CN.md](./DEFINITION_CLAUSE_DECISION_SIDECAR_CONTRACT.zh-CN.md)，固定 `RepresentativeRows / AggregateRows / ReviewRows` 三层结构。
+- 已新增 sidecar serializer [DefinitionClauseDecisionSidecarSerializer.cs](./src/TeklaBodyBracketRecognition.App/DefinitionClauseDecisionSidecarSerializer.cs)，后续可直接把 `DefinitionClauseDecisionArtifacts` 写成带 BOM UTF-8 JSON。
+- 已新增 fixture 报告构建器 [DefinitionClauseDecisionBridgeFixtureReportBuilder.cs](./src/TeklaBodyBracketRecognition.Core/Algorithms/DefinitionClauseDecisionBridgeFixtureReportBuilder.cs)，后续桥接层可先独立产出 Markdown 报告，再进 full-run。
+- 已新增 fixture artifact builder [DefinitionClauseDecisionFixtureArtifactBuilder.cs](./src/TeklaBodyBracketRecognition.App/DefinitionClauseDecisionFixtureArtifactBuilder.cs) 与 serializer [DefinitionClauseDecisionFixtureSerializer.cs](./src/TeklaBodyBracketRecognition.App/DefinitionClauseDecisionFixtureSerializer.cs)，可先把桥接层 fixture 结果独立落成 JSON。
+- 已新增 fixture Markdown 重建脚本 [Build-DefinitionClauseDecisionFixtureReport.ps1](./tools/Build-DefinitionClauseDecisionFixtureReport.ps1) 与旁路契约 [DEFINITION_CLAUSE_DECISION_FIXTURE_CONTRACT.zh-CN.md](./DEFINITION_CLAUSE_DECISION_FIXTURE_CONTRACT.zh-CN.md)。
+- 已新增统一落盘入口 [DefinitionClauseDecisionSidecarWorkflow.cs](./src/TeklaBodyBracketRecognition.App/DefinitionClauseDecisionSidecarWorkflow.cs)，固定 `summary / fixture` 两条 sidecar 的文件命名与 BOM UTF-8 落盘路径。
+- 已新增 workflow 文档 [DEFINITION_CLAUSE_DECISION_SIDECAR_WORKFLOW.zh-CN.md](./DEFINITION_CLAUSE_DECISION_SIDECAR_WORKFLOW.zh-CN.md)，把 `definition-clause-decision-summary` 和 `definition-clause-decision-fixture-report` 的双通道输出顺序固定下来。
+- 已新增 source row 模型 [DefinitionClauseDecisionSourceModels.cs](./src/TeklaBodyBracketRecognition.App/DefinitionClauseDecisionSourceModels.cs) 与 mapper [DefinitionClauseDecisionMapper.cs](./src/TeklaBodyBracketRecognition.App/DefinitionClauseDecisionMapper.cs)，把“真实结果行 -> 代表零件 -> 聚合摘要”的适配层独立出来。
+- 已新增 source 契约 [DEFINITION_CLAUSE_DECISION_SOURCE_CONTRACT.zh-CN.md](./DEFINITION_CLAUSE_DECISION_SOURCE_CONTRACT.zh-CN.md)，明确 `bridge/engine 负责判定，mapper 负责适配，artifact builder/presentation 负责输出`。
+- 已新增 demo source builder [DefinitionClauseDecisionDemoSourceBuilder.cs](./src/TeklaBodyBracketRecognition.App/DefinitionClauseDecisionDemoSourceBuilder.cs)，可先用默认 bridge fixtures 构造 `SourceRow`，验证 `Bridge -> SourceRow -> Mapper -> Sidecar` 的最小闭环。
+- 已新增 demo workflow 文档 [DEFINITION_CLAUSE_DECISION_DEMO_WORKFLOW.zh-CN.md](./DEFINITION_CLAUSE_DECISION_DEMO_WORKFLOW.zh-CN.md)，固定这条最小闭环的验证顺序。
+- 已新增 demo workflow runner [DefinitionClauseDecisionDemoWorkflowRunner.cs](./src/TeklaBodyBracketRecognition.App/DefinitionClauseDecisionDemoWorkflowRunner.cs) 与 manifest [DefinitionClauseDecisionSidecarManifest.cs](./src/TeklaBodyBracketRecognition.App/DefinitionClauseDecisionSidecarManifest.cs)，现在 demo 最小闭环除了能落盘，还会返回四个 sidecar 文件路径。
+- 已新增导出服务 [DefinitionClauseDecisionDemoExportService.cs](./src/TeklaBodyBracketRecognition.App/DefinitionClauseDecisionDemoExportService.cs) 与最短说明 [DEFINITION_CLAUSE_DECISION_DEMO_EXPORT_QUICKSTART.zh-CN.md](./DEFINITION_CLAUSE_DECISION_DEMO_EXPORT_QUICKSTART.zh-CN.md)，后续只要在任一入口挂一个调用点，就能直接导出 demo sidecar 四件套。
+- 已新增命令处理器 [DefinitionClauseDecisionDemoCommandHandler.cs](./src/TeklaBodyBracketRecognition.App/DefinitionClauseDecisionDemoCommandHandler.cs) 与结果对象 [DefinitionClauseDecisionDemoCommandResult.cs](./src/TeklaBodyBracketRecognition.App/DefinitionClauseDecisionDemoCommandResult.cs)，并固定命令行契约 [DEFINITION_CLAUSE_DECISION_DEMO_COMMANDLINE_CONTRACT.zh-CN.md](./DEFINITION_CLAUSE_DECISION_DEMO_COMMANDLINE_CONTRACT.zh-CN.md)。
+- 已新增应用入口 helper [DefinitionClauseDecisionDemoAppEntry.cs](./src/TeklaBodyBracketRecognition.App/DefinitionClauseDecisionDemoAppEntry.cs) 与接线说明 [DEFINITION_CLAUSE_DECISION_DEMO_PROGRAM_INTEGRATION.zh-CN.md](./DEFINITION_CLAUSE_DECISION_DEMO_PROGRAM_INTEGRATION.zh-CN.md)，现在只差在 `Program.cs` 挂一层很薄的调用点。
+- 已新增统一早期命令分发器 [AppEarlyCommandDispatcher.cs](./src/TeklaBodyBracketRecognition.App/AppEarlyCommandDispatcher.cs) 与契约 [APP_EARLY_COMMAND_DISPATCHER_CONTRACT.zh-CN.md](./APP_EARLY_COMMAND_DISPATCHER_CONTRACT.zh-CN.md)，后续 `Program.cs` 只接 dispatcher，不直接接 demo handler。
+- 已新增主程序接线计划 [PROGRAM_EARLY_COMMAND_HOOK_PLAN.zh-CN.md](./PROGRAM_EARLY_COMMAND_HOOK_PLAN.zh-CN.md)，把 `Program.cs` 如何接 dispatcher、接完先做哪三类 smoke 固定下来。
+- 已将早期命令 dispatcher 的薄入口正式接入 [Program.cs](./src/TeklaBodyBracketRecognition.App/Program.cs)：程序启动最前面现已先调用 `AppEarlyCommandDispatcher.TryRun(...)`，命中 demo 命令时会直接短路返回，不再进入主识别流程。
+- 已把导出目录自描述化接进 demo 导出链：新增 manifest serializer [DefinitionClauseDecisionDemoManifestSerializer.cs](./src/TeklaBodyBracketRecognition.App/DefinitionClauseDecisionDemoManifestSerializer.cs) 与目录 README builder [DefinitionClauseDecisionDemoOutputReadmeBuilder.cs](./src/TeklaBodyBracketRecognition.App/DefinitionClauseDecisionDemoOutputReadmeBuilder.cs)，并让导出服务/命令结果/应用入口一并回传 `manifest.json + README.md` 路径。
+- 下一实现焦点从“条款效果提示”收紧为“条款满足/破坏/待复核”的结构化判定，优先覆盖 `GKZ / HXZ / MJ / GL / YPGL` 五类样本。
+
+1. 继续深化阶段 5：
+   - 优先找包含 `MJ / YPGL` 的真实输入并复跑 `full-run source`，把它们在新语义主链下的 `tier / verdict / readiness / conflict-reasons` 真正落出来
+   - 继续围绕 `GL` 这类仍大多停在 `证据不足 / effect-only` 的样本，收紧“哪些弱信号仍应保守忽略、哪些已经足够进入 mixed/review”边界
+   - 在 `CoreBodyProofEngine` 上继续把 `TopologyRewrite` 从“定义条款效果”收紧到更接近“哪一种定义条款正在被满足 / 破坏”
+   - 优先围绕 `GKZ / HXZ / GL / MJ / YPGL` 这几类当前仍命中 `TopologyRewrite` 的样本，继续补“对壁闭合 / 单主板持续性 / 主轮廓控制边 / 主导跨度 / 闭环控制件集合 / 条款满足门槛 / 何时可从 effect 升级为定义判定”解释
+   - 当前优先检查：`GKZ / HXZ / GL / MJ / YPGL` 的条款效果已经在 `v37` full-run 落稳，下一步重点转向“哪些效果已足够升级成定义判定、哪些仍只能停在 effect/review 层”
+2. 回补阶段 4.5：
+   - 继续收敛 `closed-loop candidate` 的误报半径，避免把任何“四边接触包络”的站位都直接标成闭合候选
+   - 让 `internal trace` 与 `body_accessory` 的关系更清楚
+3. 阶段 6 前置准备：
+   - 为 `H / BOX / T` 的定义判定器补“多数站位结构证明 + 证明对象类型 + 家族证明目标 + 定义条款提示”输入
+## 2026-04-22 Source Pipeline 进展补充
+
+- 已新增统一 source pipeline：provider 接口 [IDefinitionClauseDecisionSourceProvider.cs](./src/TeklaBodyBracketRecognition.App/IDefinitionClauseDecisionSourceProvider.cs)、pipeline [DefinitionClauseDecisionSourcePipeline.cs](./src/TeklaBodyBracketRecognition.App/DefinitionClauseDecisionSourcePipeline.cs)、demo provider [DefinitionClauseDecisionDemoSourceProvider.cs](./src/TeklaBodyBracketRecognition.App/DefinitionClauseDecisionDemoSourceProvider.cs)。
+- demo runner 已切到这条统一路径，不再直接依赖 demo source builder。
+- 已新增说明 [DEFINITION_CLAUSE_DECISION_SOURCE_PIPELINE.zh-CN.md](./DEFINITION_CLAUSE_DECISION_SOURCE_PIPELINE.zh-CN.md)，明确后续真实结果链只需补 provider，而不是复制 demo 路径。
+- 已新增 snapshot 契约与导出骨架：模型 [DefinitionClauseDecisionSnapshotModels.cs](./src/TeklaBodyBracketRecognition.App/DefinitionClauseDecisionSnapshotModels.cs)、provider [DefinitionClauseDecisionSnapshotSourceProvider.cs](./src/TeklaBodyBracketRecognition.App/DefinitionClauseDecisionSnapshotSourceProvider.cs)、导出服务 [DefinitionClauseDecisionSnapshotExportService.cs](./src/TeklaBodyBracketRecognition.App/DefinitionClauseDecisionSnapshotExportService.cs)。
+- 已新增说明 [DEFINITION_CLAUSE_DECISION_SNAPSHOT_CONTRACT.zh-CN.md](./DEFINITION_CLAUSE_DECISION_SNAPSHOT_CONTRACT.zh-CN.md)，后续真实结果链优先走“真实结果 -> snapshot -> source pipeline -> sidecar”。
+- 已新增 [DefinitionClauseDecisionDemoSnapshotBuilder.cs](./src/TeklaBodyBracketRecognition.App/DefinitionClauseDecisionDemoSnapshotBuilder.cs)，并把 demo runner 正式切到 snapshot export service；现在 demo 闭环已经实际验证了“demo snapshot -> snapshot export service -> sidecar”这条路径。
+- 已新增 snapshot extractor/pipeline：接口 [IDefinitionClauseDecisionSnapshotExtractor.cs](./src/TeklaBodyBracketRecognition.App/IDefinitionClauseDecisionSnapshotExtractor.cs)、pipeline [DefinitionClauseDecisionSnapshotPipeline.cs](./src/TeklaBodyBracketRecognition.App/DefinitionClauseDecisionSnapshotPipeline.cs)、demo extractor [DefinitionClauseDecisionDemoSnapshotExtractor.cs](./src/TeklaBodyBracketRecognition.App/DefinitionClauseDecisionDemoSnapshotExtractor.cs)。
+- demo runner 已进一步切到 `DemoSnapshotExtractor -> SnapshotPipeline -> SnapshotExportService -> Sidecar`，并新增说明 [DEFINITION_CLAUSE_DECISION_SNAPSHOT_PIPELINE.zh-CN.md](./DEFINITION_CLAUSE_DECISION_SNAPSHOT_PIPELINE.zh-CN.md)。
+- snapshot 现已直接落盘到 demo 导出目录：新增 [DefinitionClauseDecisionSnapshotSerializer.cs](./src/TeklaBodyBracketRecognition.App/DefinitionClauseDecisionSnapshotSerializer.cs)，并把 `definition-clause-decision-snapshot.json` 路径贯通到 manifest、导出服务、命令结果、应用入口和目录 README。
+- 已新增 snapshot round-trip 自检链：模型 [DefinitionClauseDecisionSnapshotRoundTripModels.cs](./src/TeklaBodyBracketRecognition.App/DefinitionClauseDecisionSnapshotRoundTripModels.cs)、分析服务 [DefinitionClauseDecisionSnapshotRoundTripService.cs](./src/TeklaBodyBracketRecognition.App/DefinitionClauseDecisionSnapshotRoundTripService.cs)、报告构建器 [DefinitionClauseDecisionSnapshotRoundTripReportBuilder.cs](./src/TeklaBodyBracketRecognition.App/DefinitionClauseDecisionSnapshotRoundTripReportBuilder.cs)、serializer [DefinitionClauseDecisionSnapshotRoundTripSerializer.cs](./src/TeklaBodyBracketRecognition.App/DefinitionClauseDecisionSnapshotRoundTripSerializer.cs)。
+- 现在 demo 导出目录会额外落出 `definition-clause-decision-snapshot-roundtrip.json/.md`，用于先验证 `snapshot -> source rows -> representative rows -> aggregate rows -> review rows` 这条链是否闭合。
+- 已把 snapshot / snapshot-roundtrip 路径继续贯通到 `SnapshotExportResult / DemoExportResult / DemoCommandResult / DemoAppEntry`，命令成功时会直接回显 snapshot 与 roundtrip 的文件路径，不再只暴露 summary/fixture。
+- 已新增 snapshot validation 自检链：结果 [DefinitionClauseDecisionSnapshotValidationResult.cs](./src/TeklaBodyBracketRecognition.App/DefinitionClauseDecisionSnapshotValidationResult.cs)、校验器 [DefinitionClauseDecisionSnapshotValidator.cs](./src/TeklaBodyBracketRecognition.App/DefinitionClauseDecisionSnapshotValidator.cs)、报告构建器 [DefinitionClauseDecisionSnapshotValidationReportBuilder.cs](./src/TeklaBodyBracketRecognition.App/DefinitionClauseDecisionSnapshotValidationReportBuilder.cs)、serializer [DefinitionClauseDecisionSnapshotValidationSerializer.cs](./src/TeklaBodyBracketRecognition.App/DefinitionClauseDecisionSnapshotValidationSerializer.cs)。
+- 现在 demo 导出目录会先落出 `definition-clause-decision-snapshot-validation.json/.md`，后续真实 extractor 接入时，先看 snapshot validation，再看 snapshot roundtrip。
+- 已把 snapshot validation 路径继续贯通到 `SnapshotExportResult / DemoExportResult / DemoCommandResult / DemoAppEntry`，命令成功时现在会直接回显 snapshot validation / roundtrip / summary / fixture 的完整文件路径集合。
+- 已新增 demo 输出自校验链：模型 [DefinitionClauseDecisionDemoOutputValidationResult.cs](./src/TeklaBodyBracketRecognition.App/DefinitionClauseDecisionDemoOutputValidationResult.cs)、校验器 [DefinitionClauseDecisionDemoOutputValidator.cs](./src/TeklaBodyBracketRecognition.App/DefinitionClauseDecisionDemoOutputValidator.cs)、报告构建器 [DefinitionClauseDecisionDemoOutputValidationReportBuilder.cs](./src/TeklaBodyBracketRecognition.App/DefinitionClauseDecisionDemoOutputValidationReportBuilder.cs)。
+- 已新增 validation serializer [DefinitionClauseDecisionDemoOutputValidationSerializer.cs](./src/TeklaBodyBracketRecognition.App/DefinitionClauseDecisionDemoOutputValidationSerializer.cs)，demo 导出服务现在会额外落出 `definition-clause-decision-demo-validation.json/.md`，并把其路径继续贯通到 `DemoExportResult / DemoCommandResult / DemoAppEntry`；当前导出目录已具备“manifest + README + validation(json+md)”三层自描述/自校验能力。
+> 2026-04-22 23:xx 新进展：已新增 [DEFINITION_CLAUSE_DECISION_SEMANTIC_REGRESSION_CASES.zh-CN.md](./DEFINITION_CLAUSE_DECISION_SEMANTIC_REGRESSION_CASES.zh-CN.md)，冻结 `SYNTHETIC_NONE_TOPOLOGY / SYNTHETIC_TARGET_ONLY_REVIEW` 的 tier / verdict / readiness 契约，下一步按该契约把两类样本补进 mapper / effect-adapter fixtures，再并回旧 bridge / fixture / sidecar 导出链。
+> 2026-04-22 23:50 新进展：已新增 [DefinitionClauseDecisionSemanticRegressionCatalog.cs](./src/TeklaBodyBracketRecognition.Core/Algorithms/DefinitionClauseDecisionSemanticRegressionCatalog.cs)，把 `SYNTHETIC_NONE_TOPOLOGY / SYNTHETIC_TARGET_ONLY_REVIEW` 收成独立代码级 catalog，下一步直接把该 catalog 并入 mapper / effect-adapter fixtures，而不是重新散落翻译契约。
+> 2026-04-23 00:03 新进展：已新增 [DefinitionClauseDecisionSemanticRegressionSnapshot.cs](./src/TeklaBodyBracketRecognition.Core/Algorithms/DefinitionClauseDecisionSemanticRegressionSnapshot.cs)，把语义回归 catalog 进一步提升为可比较的 snapshot 行集合，下一步可直接拿它去接 runner / artifact / fixture 对比，而不必重复把枚举契约翻译成字符串摘要。
+> 2026-04-23 00:05 新进展：已新增 [DefinitionClauseDecisionSemanticRegressionSnapshotReportBuilder.cs](./src/TeklaBodyBracketRecognition.Core/Algorithms/DefinitionClauseDecisionSemanticRegressionSnapshotReportBuilder.cs)，让 semantic regression snapshot 可直接导出成 Markdown，对下一轮把样本接入现有 runner / artifact / bundle 提前铺平输出层。
+> 2026-04-23 00:16 新进展：已新增 [DefinitionClauseDecisionSemanticRegressionArtifactModels.cs](./src/TeklaBodyBracketRecognition.App/DefinitionClauseDecisionSemanticRegressionArtifactModels.cs)、[DefinitionClauseDecisionSemanticRegressionArtifactBuilder.cs](./src/TeklaBodyBracketRecognition.App/DefinitionClauseDecisionSemanticRegressionArtifactBuilder.cs)、[DefinitionClauseDecisionSemanticRegressionArtifactSerializer.cs](./src/TeklaBodyBracketRecognition.App/DefinitionClauseDecisionSemanticRegressionArtifactSerializer.cs)、[DefinitionClauseDecisionSemanticRegressionWorkflow.cs](./src/TeklaBodyBracketRecognition.App/DefinitionClauseDecisionSemanticRegressionWorkflow.cs) 与 [DEFINITION_CLAUSE_DECISION_SEMANTIC_REGRESSION_WORKFLOW.zh-CN.md](./DEFINITION_CLAUSE_DECISION_SEMANTIC_REGRESSION_WORKFLOW.zh-CN.md)，已把 semantic regression snapshot/report 提升成独立 JSON/Markdown sidecar workflow。
+> 2026-04-23 00:28 新进展：已为 [DefinitionClauseDecisionSemanticRegressionWorkflow.cs](./src/TeklaBodyBracketRecognition.App/DefinitionClauseDecisionSemanticRegressionWorkflow.cs) 补上 `manifest.json + README.md` 自描述输出，并新增 [DefinitionClauseDecisionSemanticRegressionManifest.cs](./src/TeklaBodyBracketRecognition.App/DefinitionClauseDecisionSemanticRegressionManifest.cs)、[DefinitionClauseDecisionSemanticRegressionManifestSerializer.cs](./src/TeklaBodyBracketRecognition.App/DefinitionClauseDecisionSemanticRegressionManifestSerializer.cs)、[DefinitionClauseDecisionSemanticRegressionOutputReadmeBuilder.cs](./src/TeklaBodyBracketRecognition.App/DefinitionClauseDecisionSemanticRegressionOutputReadmeBuilder.cs)，现在这条 semantic regression workflow 已具备更标准的 bundle-friendly 形态。
+> 2026-04-23 00:40 新进展：已新增 [DefinitionClauseDecisionSemanticRegressionBundleSection.cs](./src/TeklaBodyBracketRecognition.App/DefinitionClauseDecisionSemanticRegressionBundleSection.cs)、[DefinitionClauseDecisionSemanticRegressionBundleSectionBuilder.cs](./src/TeklaBodyBracketRecognition.App/DefinitionClauseDecisionSemanticRegressionBundleSectionBuilder.cs)、[DefinitionClauseDecisionSemanticRegressionBundleSectionMarkdownBuilder.cs](./src/TeklaBodyBracketRecognition.App/DefinitionClauseDecisionSemanticRegressionBundleSectionMarkdownBuilder.cs) 与 [DEFINITION_CLAUSE_DECISION_SEMANTIC_REGRESSION_BUNDLE_INTEGRATION.zh-CN.md](./DEFINITION_CLAUSE_DECISION_SEMANTIC_REGRESSION_BUNDLE_INTEGRATION.zh-CN.md)，semantic regression workflow 现已具备更明确的 validation-bundle section 适配层。
+> 2026-04-23 00:52 新进展：已新增 [DefinitionClauseDecisionSemanticRegressionBundleSectionSerializer.cs](./src/TeklaBodyBracketRecognition.App/DefinitionClauseDecisionSemanticRegressionBundleSectionSerializer.cs)，并让 [DefinitionClauseDecisionSemanticRegressionWorkflow.cs](./src/TeklaBodyBracketRecognition.App/DefinitionClauseDecisionSemanticRegressionWorkflow.cs) 额外落盘 `bundle-section.json + bundle-section-summary.md`；semantic regression workflow 现在不仅 bundle-friendly，而且已经能直接提供可收集的 section 文件。
+> 2026-04-23 01:04 新进展：已新增 [DefinitionClauseDecisionSemanticRegressionBundleAttachment.cs](./src/TeklaBodyBracketRecognition.App/DefinitionClauseDecisionSemanticRegressionBundleAttachment.cs) 与 [DefinitionClauseDecisionSemanticRegressionBundleAttachmentBuilder.cs](./src/TeklaBodyBracketRecognition.App/DefinitionClauseDecisionSemanticRegressionBundleAttachmentBuilder.cs)，把 semantic regression workflow + section + summary block 收敛成单调用 attachment，后续并入既有 validation bundle workflow 时只需接这一层薄入口。
+> 2026-04-23 01:16 新进展：已新增 [DefinitionClauseDecisionBridgeValidationBundleSemanticRegressionContribution.cs](./src/TeklaBodyBracketRecognition.App/DefinitionClauseDecisionBridgeValidationBundleSemanticRegressionContribution.cs)、[DefinitionClauseDecisionBridgeValidationBundleSemanticRegressionContributionBuilder.cs](./src/TeklaBodyBracketRecognition.App/DefinitionClauseDecisionBridgeValidationBundleSemanticRegressionContributionBuilder.cs) 与 [DEFINITION_CLAUSE_DECISION_BRIDGE_VALIDATION_BUNDLE_SEMANTIC_REGRESSION.zh-CN.md](./DEFINITION_CLAUSE_DECISION_BRIDGE_VALIDATION_BUNDLE_SEMANTIC_REGRESSION.zh-CN.md)，semantic regression 现已拥有贴近既有 validation bundle 命名体系的专用并回入口。
+> 2026-04-23 01:27 新进展：已新增 [DefinitionClauseDecisionBridgeValidationBundleSemanticRegressionManifestEntry.cs](./src/TeklaBodyBracketRecognition.App/DefinitionClauseDecisionBridgeValidationBundleSemanticRegressionManifestEntry.cs) 与 [DefinitionClauseDecisionBridgeValidationBundleSemanticRegressionContributionComposer.cs](./src/TeklaBodyBracketRecognition.App/DefinitionClauseDecisionBridgeValidationBundleSemanticRegressionContributionComposer.cs)，semantic regression contribution 现已具备并入旧 validation bundle 所需的 manifest entry 形态和 summary/readme 统一追加规则。
+> 2026-04-23 01:17 新进展：已新增 [DefinitionClauseDecisionBridgeValidationBundleSemanticRegressionMergeResult.cs](./src/TeklaBodyBracketRecognition.App/DefinitionClauseDecisionBridgeValidationBundleSemanticRegressionMergeResult.cs)、[DefinitionClauseDecisionBridgeValidationBundleSemanticRegressionMerger.cs](./src/TeklaBodyBracketRecognition.App/DefinitionClauseDecisionBridgeValidationBundleSemanticRegressionMerger.cs) 与 [DEFINITION_CLAUSE_DECISION_BRIDGE_VALIDATION_BUNDLE_SEMANTIC_REGRESSION_MERGE.zh-CN.md](./DEFINITION_CLAUSE_DECISION_BRIDGE_VALIDATION_BUNDLE_SEMANTIC_REGRESSION_MERGE.zh-CN.md)，semantic regression 并入旧 validation bundle 主链所需的调用面已进一步压缩为单个 `Merge(...)` 入口。
+> 2026-04-23 01:29 新进展：已新增 [DefinitionClauseDecisionBridgeValidationBundleSemanticRegressionMergeApplicator.cs](./src/TeklaBodyBracketRecognition.App/DefinitionClauseDecisionBridgeValidationBundleSemanticRegressionMergeApplicator.cs) 与 [DEFINITION_CLAUSE_DECISION_BRIDGE_VALIDATION_BUNDLE_SEMANTIC_REGRESSION_APPLY.zh-CN.md](./DEFINITION_CLAUSE_DECISION_BRIDGE_VALIDATION_BUNDLE_SEMANTIC_REGRESSION_APPLY.zh-CN.md)，semantic regression 并回旧 validation bundle 主链的调用面已进一步压缩成单次 `Apply(...)`。
+> 2026-04-23 01:29 新进展：已新增 [DefinitionClauseDecisionBridgeValidationBundleWorkflowSemanticRegressionPostMergeResult.cs](./src/TeklaBodyBracketRecognition.App/DefinitionClauseDecisionBridgeValidationBundleWorkflowSemanticRegressionPostMergeResult.cs)、[DefinitionClauseDecisionBridgeValidationBundleWorkflowSemanticRegressionPostMerge.cs](./src/TeklaBodyBracketRecognition.App/DefinitionClauseDecisionBridgeValidationBundleWorkflowSemanticRegressionPostMerge.cs) 与 [DEFINITION_CLAUSE_DECISION_BRIDGE_VALIDATION_BUNDLE_WORKFLOW_SEMANTIC_REGRESSION_POST_MERGE.zh-CN.md](./DEFINITION_CLAUSE_DECISION_BRIDGE_VALIDATION_BUNDLE_WORKFLOW_SEMANTIC_REGRESSION_POST_MERGE.zh-CN.md)，现已具备一条通过反射调用旧 validation bundle workflow 并对 summary/readme/manifest 进行 semantic regression 后合并的包装工作流。
+> 2026-04-23 01:43 新进展：已新增 [DefinitionClauseDecisionBridgeValidationBundleWorkflowSemanticRegressionPostMergeSmokeManifest.cs](./src/TeklaBodyBracketRecognition.App/DefinitionClauseDecisionBridgeValidationBundleWorkflowSemanticRegressionPostMergeSmokeManifest.cs)、[DefinitionClauseDecisionBridgeValidationBundleWorkflowSemanticRegressionPostMergeSmokeSerializer.cs](./src/TeklaBodyBracketRecognition.App/DefinitionClauseDecisionBridgeValidationBundleWorkflowSemanticRegressionPostMergeSmokeSerializer.cs)、[DefinitionClauseDecisionBridgeValidationBundleWorkflowSemanticRegressionPostMergeSmokeReadmeBuilder.cs](./src/TeklaBodyBracketRecognition.App/DefinitionClauseDecisionBridgeValidationBundleWorkflowSemanticRegressionPostMergeSmokeReadmeBuilder.cs)、[DefinitionClauseDecisionBridgeValidationBundleWorkflowSemanticRegressionPostMergeSmokeWorkflow.cs](./src/TeklaBodyBracketRecognition.App/DefinitionClauseDecisionBridgeValidationBundleWorkflowSemanticRegressionPostMergeSmokeWorkflow.cs) 与 [DEFINITION_CLAUSE_DECISION_BRIDGE_VALIDATION_BUNDLE_WORKFLOW_SEMANTIC_REGRESSION_POST_MERGE_SMOKE.zh-CN.md](./DEFINITION_CLAUSE_DECISION_BRIDGE_VALIDATION_BUNDLE_WORKFLOW_SEMANTIC_REGRESSION_POST_MERGE_SMOKE.zh-CN.md)，现已具备一条最小 smoke workflow 用于验证 post-merge 包装层的路径解析与工件稳定性。
+> 2026-04-23 01:43 新进展：已新增 [DefinitionClauseDecisionBridgeValidationBundleWorkflowSemanticRegressionPostMergeSmokeCommandResult.cs](./src/TeklaBodyBracketRecognition.App/DefinitionClauseDecisionBridgeValidationBundleWorkflowSemanticRegressionPostMergeSmokeCommandResult.cs)、[DefinitionClauseDecisionBridgeValidationBundleWorkflowSemanticRegressionPostMergeSmokeExportService.cs](./src/TeklaBodyBracketRecognition.App/DefinitionClauseDecisionBridgeValidationBundleWorkflowSemanticRegressionPostMergeSmokeExportService.cs)、[DefinitionClauseDecisionBridgeValidationBundleWorkflowSemanticRegressionPostMergeSmokeCommandHandler.cs](./src/TeklaBodyBracketRecognition.App/DefinitionClauseDecisionBridgeValidationBundleWorkflowSemanticRegressionPostMergeSmokeCommandHandler.cs)、[DefinitionClauseDecisionBridgeValidationBundleWorkflowSemanticRegressionPostMergeSmokeAppEntry.cs](./src/TeklaBodyBracketRecognition.App/DefinitionClauseDecisionBridgeValidationBundleWorkflowSemanticRegressionPostMergeSmokeAppEntry.cs) 与 [DEFINITION_CLAUSE_DECISION_BRIDGE_VALIDATION_BUNDLE_WORKFLOW_SEMANTIC_REGRESSION_POST_MERGE_SMOKE_COMMANDLINE_CONTRACT.zh-CN.md](./DEFINITION_CLAUSE_DECISION_BRIDGE_VALIDATION_BUNDLE_WORKFLOW_SEMANTIC_REGRESSION_POST_MERGE_SMOKE_COMMANDLINE_CONTRACT.zh-CN.md)，post-merge smoke workflow 现已具备独立命令行入口雏形。
+> 2026-04-23 01:57 新进展：已新增 [DefinitionClauseDecisionBridgeValidationBundleWorkflowSemanticRegressionPostMergeSmokeDispatcherAdapter.cs](./src/TeklaBodyBracketRecognition.App/DefinitionClauseDecisionBridgeValidationBundleWorkflowSemanticRegressionPostMergeSmokeDispatcherAdapter.cs) 与 [APP_EARLY_COMMAND_DISPATCHER_SEMANTIC_REGRESSION_POST_MERGE_SMOKE_INTEGRATION.zh-CN.md](./APP_EARLY_COMMAND_DISPATCHER_SEMANTIC_REGRESSION_POST_MERGE_SMOKE_INTEGRATION.zh-CN.md)，post-merge smoke 命令现已具备可被既有 `AppEarlyCommandDispatcher` 直接消费的 adapter 入口。
+> 2026-04-23 02:09 新进展：已新增 [DefinitionClauseDecisionBridgeValidationBundleWorkflowSemanticRegressionPostMergeSmokeValidationResult.cs](./src/TeklaBodyBracketRecognition.App/DefinitionClauseDecisionBridgeValidationBundleWorkflowSemanticRegressionPostMergeSmokeValidationResult.cs)、[DefinitionClauseDecisionBridgeValidationBundleWorkflowSemanticRegressionPostMergeSmokeValidator.cs](./src/TeklaBodyBracketRecognition.App/DefinitionClauseDecisionBridgeValidationBundleWorkflowSemanticRegressionPostMergeSmokeValidator.cs) 与 [DEFINITION_CLAUSE_DECISION_BRIDGE_VALIDATION_BUNDLE_WORKFLOW_SEMANTIC_REGRESSION_POST_MERGE_SMOKE_VALIDATION.zh-CN.md](./DEFINITION_CLAUSE_DECISION_BRIDGE_VALIDATION_BUNDLE_WORKFLOW_SEMANTIC_REGRESSION_POST_MERGE_SMOKE_VALIDATION.zh-CN.md)，并让 smoke command handler 在导出后自动校验关键 manifest / README / summary / bundle-section 文件，现已具备最小“自证成功/失败”能力。
+> 2026-04-23 02:21 新进展：已新增 [APP_EARLY_COMMAND_DISPATCHER_SEMANTIC_REGRESSION_POST_MERGE_SMOKE_HOOK_CONTRACT.zh-CN.md](./APP_EARLY_COMMAND_DISPATCHER_SEMANTIC_REGRESSION_POST_MERGE_SMOKE_HOOK_CONTRACT.zh-CN.md)，把 post-merge smoke 命令接入既有 `AppEarlyCommandDispatcher` 时的最小短路约定、退出码语义、推荐插入位置和返回规则全部冻结下来。
+> 2026-04-23 02:22 新进展：已新增 [DefinitionClauseDecisionBridgeValidationBundleWorkflowSemanticRegressionPostMergeSmokeValidationArtifacts.cs](./src/TeklaBodyBracketRecognition.App/DefinitionClauseDecisionBridgeValidationBundleWorkflowSemanticRegressionPostMergeSmokeValidationArtifacts.cs)、[DefinitionClauseDecisionBridgeValidationBundleWorkflowSemanticRegressionPostMergeSmokeValidationArtifactBuilder.cs](./src/TeklaBodyBracketRecognition.App/DefinitionClauseDecisionBridgeValidationBundleWorkflowSemanticRegressionPostMergeSmokeValidationArtifactBuilder.cs)、[DefinitionClauseDecisionBridgeValidationBundleWorkflowSemanticRegressionPostMergeSmokeValidationArtifactSerializer.cs](./src/TeklaBodyBracketRecognition.App/DefinitionClauseDecisionBridgeValidationBundleWorkflowSemanticRegressionPostMergeSmokeValidationArtifactSerializer.cs) 与 [DEFINITION_CLAUSE_DECISION_BRIDGE_VALIDATION_BUNDLE_WORKFLOW_SEMANTIC_REGRESSION_POST_MERGE_SMOKE_VALIDATION_ARTIFACTS.zh-CN.md](./DEFINITION_CLAUSE_DECISION_BRIDGE_VALIDATION_BUNDLE_WORKFLOW_SEMANTIC_REGRESSION_POST_MERGE_SMOKE_VALIDATION_ARTIFACTS.zh-CN.md)，现在最小 smoke 命令在导出与校验后还会额外落盘 `validation.json + validation.md`。
+> 2026-04-23 02:35 新进展：已新增 [APP_EARLY_COMMAND_DISPATCHER_SEMANTIC_REGRESSION_POST_MERGE_SMOKE_PATCH_SNIPPET.zh-CN.md](./APP_EARLY_COMMAND_DISPATCHER_SEMANTIC_REGRESSION_POST_MERGE_SMOKE_PATCH_SNIPPET.zh-CN.md)，把下一轮编辑 `AppEarlyCommandDispatcher.cs` 所需的最小插入片段、短路要求与最小实跑顺序全部冻结下来。
+> 2026-04-23 02:38 已新增 `DefinitionClauseDecisionBridgeValidationBundleWorkflowSemanticRegressionPostMergeSmokeDispatchDecision.cs` 与 `...DispatchBridge.cs`，把 post-merge smoke dispatcher adapter 的多 `out` 参数收敛成单一 decision 返回对象；真正修改 `AppEarlyCommandDispatcher.cs` 时可直接判断 `Handled` 并读取 `ExitCode / Message / OutputDirectory`，继续缩小旧入口 patch 面。
+> 2026-04-23 02:50 已新增 `DefinitionClauseDecisionBridgeValidationBundleWorkflowSemanticRegressionPostMergeSmokeAppEarlyCommandDispatcherHook.cs`，把 post-merge smoke 的旧 dispatcher 接入面进一步压缩成“一次 `TryRun(...)` 调用 + 一次 `return exitCode`”；message 与 outputDirectory 输出现已封装进新 hook，后续真正修改 `AppEarlyCommandDispatcher.cs` 时不必再理解 `adapter / decision` 细节。
+> 2026-04-23 03:07 已新增 `DefinitionClauseDecisionBridgeValidationBundleWorkflowSemanticRegressionPostMergeSmokeOutputContract.cs`，把 post-merge smoke 的输出目录名与 `manifest.json / README.md / validation.json / validation.md / bundle-section-summary.md` 统一冻结为独立契约，优先推动输出契约清理主线；后续 smoke workflow、validator 与 dispatcher 文档可逐步改为引用这份单一真源。
+> 2026-04-23 03:18 已新增 `DefinitionClauseDecisionBridgeValidationBundleWorkflowSemanticRegressionPostMergeSmokeOutputPaths.cs` 与 `...OutputPathResolver.cs`，把 post-merge smoke 的输出路径模型从“目录名/文件名常量”继续推进到“统一路径对象 + root/outputDirectory 双入口解析”；后续 smoke workflow、validator 与 dispatcher 最小实跑都可逐步改为引用同一套路径解析。
+> 2026-04-23 03:30 已新增 `DefinitionClauseDecisionBridgeValidationBundleWorkflowSemanticRegressionPostMergeSmokeRequiredArtifactSnapshot.cs` 与 `...RequiredArtifactInspector.cs`，把 post-merge smoke 的“完成态”从零散文件存在判断收敛为统一共享检查层；当前 `manifest.json / README.md / validation.json / validation.md / bundle-section-summary.md` 五个文件已被冻结为共享必需工件，后续 validator 与 dispatcher 回查都可复用这套判定。
+> 2026-04-23 03:42 已新增 `DefinitionClauseDecisionBridgeValidationBundleWorkflowSemanticRegressionPostMergeSmokeRequiredArtifactSummaryFormatter.cs`，把 post-merge smoke 共享工件检查结果的 console / Markdown 输出统一收口；后续 smoke validator、dispatcher 最小回查与 README/validation 说明都可逐步复用这套 formatter，而不是各自拼 `complete / missing artifacts` 文案。
+> 2026-04-23 03:54 已新增 `DefinitionClauseDecisionBridgeValidationBundleWorkflowSemanticRegressionPostMergeSmokeRequiredArtifactAudit.cs` 与 `...RequiredArtifactAuditBuilder.cs`，把 post-merge smoke 的路径解析、共享工件检查与统一输出进一步压缩成单次 audit 调用；后续 smoke validator、dispatcher 回查或最小实跑入口可直接依赖 `audit.IsComplete / audit.ConsoleMessage / audit.MarkdownBlock`，继续缩小接入面。
+> 2026-04-23 04:07 已新增 `DefinitionClauseDecisionBridgeValidationBundleWorkflowSemanticRegressionPostMergeSmokeRequiredArtifactAuditDecision.cs` 与 `...RequiredArtifactAuditDecisionBuilder.cs`，把 post-merge smoke 的共享工件 audit 结果进一步冻结为 `exitCode + consoleMessage` 语义；后续 smoke handler、dispatcher 或最小实跑入口可直接依赖这套 decision，而不必再各自重复写“完整=0 / 缺失=1”的退出码规则。
+> 2026-04-23 04:20 已新增 `DefinitionClauseDecisionBridgeValidationBundleWorkflowSemanticRegressionPostMergeSmokeRequiredArtifactAuditArtifact.cs`、`...AuditArtifactBuilder.cs` 与 `...AuditArtifactSerializer.cs`，把 post-merge smoke 的共享 audit decision 进一步推进成统一的 `validation.json / validation.md` 工件生成方式；后续 smoke validator 或最小实跑入口可直接复用这套 artifact builder/serializer，不必再手写 validation 输出结构。
+> 2026-04-23 04:31 已新增 `DefinitionClauseDecisionBridgeValidationBundleWorkflowSemanticRegressionPostMergeSmokeRequiredArtifactAuditArtifactWorkflow.cs` 与 `...WorkflowResult.cs`，把 post-merge smoke 的共享 audit decision 进一步收口成统一 validation artifact workflow；后续 smoke validator、dispatcher 回查或最小实跑入口可直接调用 `RunFromOutputDirectory(...)` / `RunFromOutputRootDirectory(...)` 重建 `validation.json / validation.md`。
+> 2026-04-23 04:43 已新增阶段 2 分层契约 `BodyCandidatePartitionLane.cs`、`BodyCandidatePartitionEvidenceCode.cs` 与 `BodyCandidatePartitionDecision.cs`，并补充说明文档 `BODY_CANDIDATE_PARTITION_LANES_AND_EVIDENCE.zh-CN.md`；当前已先把主体核心候选、主体支撑候选、主体附件、外部上下文与 review 五类保守 lane 及其 evidence code 冻结下来，为后续 body-candidate partitioner 回接提供统一输出语言。
+> 2026-04-23 04:55 已新增阶段 2 的最小可执行输入契约 `BodyCandidatePartitionSignalSnapshot.cs` 与保守纯映射骨架 `BodyCandidatePartitionConservativeMapper.cs`，并补充文档 `BODY_CANDIDATE_PARTITION_SIGNAL_CONTRACT.zh-CN.md`；同时新增 `BodySupportAdjacency` 证据码，用于把“主体支撑候选”与“主体核心控制件 / 附件拓扑”进一步区分开。当前阶段 2 已从“lane/evidence 名词冻结”推进到“source signal -> lane/evidence/review”的可执行保守映射层。
+> 2026-04-23 05:07 已新增阶段 2 默认夹具与最小 runner：`BodyCandidatePartitionConservativeFixture.cs`、`BodyCandidatePartitionConservativeFixtures.cs`、`BodyCandidatePartitionConservativeFixtureResult.cs`、`BodyCandidatePartitionConservativeFixtureRunner.cs`，并补充文档 `BODY_CANDIDATE_PARTITION_CONSERVATIVE_FIXTURES.zh-CN.md`；当前阶段 2 已具备 `signal snapshot -> conservative mapper -> decision` 的最小代码级回归面，可先守住 core/support/accessory/external/review 五类保守落点。
+> 2026-04-23 05:20 已新增阶段 2 报告构建器 `BodyCandidatePartitionConservativeFixtureReportBuilder.cs` 与说明文档 `BODY_CANDIDATE_PARTITION_CONSERVATIVE_FIXTURE_REPORT.zh-CN.md`，当前阶段 2 已形成 `signal snapshot -> conservative mapper -> fixture runner -> Markdown report` 的最小闭环；后续即使还没接旧 partitioner，也已经能稳定查看 core/support/accessory/external/review 五类保守落点的通过/失败原因。
+> 2026-04-23 05:33 已新增阶段 2 artifact/workflow：`BodyCandidatePartitionConservativeFixtureArtifactModels.cs`、`BodyCandidatePartitionConservativeFixtureArtifactBuilder.cs`、`BodyCandidatePartitionConservativeFixtureSerializer.cs`、`BodyCandidatePartitionConservativeFixtureWorkflow.cs` 与 `...WorkflowResult.cs`，并补充文档 `BODY_CANDIDATE_PARTITION_CONSERVATIVE_FIXTURE_WORKFLOW.zh-CN.md`；当前阶段 2 已形成 `signal snapshot -> conservative mapper -> fixture runner -> Markdown report -> artifact/workflow` 的最小默认导出链。
+> 2026-04-23 05:45 已新增阶段 2 package workflow：`BodyCandidatePartitionConservativeFixtureManifest.cs`、`BodyCandidatePartitionConservativeFixtureManifestSerializer.cs`、`BodyCandidatePartitionConservativeFixtureOutputReadmeBuilder.cs`、`BodyCandidatePartitionConservativeFixturePackageWorkflow.cs` 与 `...PackageWorkflowResult.cs`，并补充文档 `BODY_CANDIDATE_PARTITION_CONSERVATIVE_FIXTURE_PACKAGE_WORKFLOW.zh-CN.md`；当前阶段 2 已形成 `signal snapshot -> conservative mapper -> fixture runner -> report -> artifact/workflow -> manifest/README package` 的最小默认目录包。
+> 2026-04-23 05:57 已新增阶段 2 最小 command/export/app-entry 契约：`BodyCandidatePartitionConservativeFixtureCommandResult.cs`、`BodyCandidatePartitionConservativeFixtureExportService.cs`、`BodyCandidatePartitionConservativeFixtureCommandHandler.cs`、`BodyCandidatePartitionConservativeFixtureAppEntry.cs`，并补充文档 `BODY_CANDIDATE_PARTITION_CONSERVATIVE_FIXTURE_COMMANDLINE_CONTRACT.zh-CN.md`；当前阶段 2 默认导出链已具备 `command -> export service -> package workflow` 的最小可运行入口。
+> 2026-04-23 06:09 已新增阶段 2 的 dispatcher-facing 适配层：`BodyCandidatePartitionConservativeFixtureDispatcherAdapter.cs`、`BodyCandidatePartitionConservativeFixtureAppEarlyCommandDispatcherHook.cs`，并补充文档 `APP_EARLY_COMMAND_DISPATCHER_BODY_CANDIDATE_PARTITION_CONSERVATIVE_FIXTURE_INTEGRATION.zh-CN.md`；当前阶段 2 默认导出链已具备 `command -> export service -> package workflow -> dispatcher adapter/hook` 的最薄接线面。
+> 2026-04-23 06:21 已新增阶段 2 输出契约 `BodyCandidatePartitionConservativeFixtureOutputContract.cs`、`BodyCandidatePartitionConservativeFixtureOutputPaths.cs` 与 `BodyCandidatePartitionConservativeFixtureOutputPathResolver.cs`，并补充文档 `BODY_CANDIDATE_PARTITION_CONSERVATIVE_FIXTURE_OUTPUT_CONTRACT.zh-CN.md`；当前阶段 2 默认导出链已具备统一的目录名与关键文件路径真源，后续 command/package/dispatcher 消费方可逐步切到这套 contract/resolver。
+> 2026-04-23 06:33 已新增阶段 2 共享 output audit：`BodyCandidatePartitionConservativeFixtureOutputAudit.cs` 与 `BodyCandidatePartitionConservativeFixtureOutputAuditBuilder.cs`，并补充文档 `BODY_CANDIDATE_PARTITION_CONSERVATIVE_FIXTURE_OUTPUT_AUDIT.zh-CN.md`；当前阶段 2 默认目录包四件套（json/md/manifest/README）已具备统一的完整性判断层，后续 command/package/dispatcher 消费方可逐步复用这套 audit。
+> 2026-04-23 06:45 已新增阶段 2 自校验 workflow：`BodyCandidatePartitionConservativeFixturePackageAuditResult.cs` 与 `BodyCandidatePartitionConservativeFixturePackageAuditWorkflow.cs`，并补充文档 `BODY_CANDIDATE_PARTITION_CONSERVATIVE_FIXTURE_PACKAGE_AUDIT_WORKFLOW.zh-CN.md`；当前阶段 2 默认导出链已具备“package workflow + output audit -> unified exitCode” 的最小自校验能力。
+> 2026-04-23 05:44 阶段 2 继续推进到“可触发的 package-audit 命令链”：新增 `BodyCandidatePartitionConservativeFixturePackageAuditCommandResult.cs`、`BodyCandidatePartitionConservativeFixturePackageAuditExportService.cs`、`BodyCandidatePartitionConservativeFixturePackageAuditCommandHandler.cs`、`BodyCandidatePartitionConservativeFixturePackageAuditAppEntry.cs` 与 `BodyCandidatePartitionConservativeFixturePackageAuditAppEarlyCommandDispatcherHook.cs`，并冻结 `BODY_CANDIDATE_PARTITION_CONSERVATIVE_FIXTURE_PACKAGE_AUDIT_COMMANDLINE_CONTRACT.zh-CN.md` 与 `APP_EARLY_COMMAND_DISPATCHER_BODY_CANDIDATE_PARTITION_CONSERVATIVE_FIXTURE_PACKAGE_AUDIT_INTEGRATION.zh-CN.md`；当前依旧未触碰旧 dispatcher 本体，等入口源码可安全读取后再插 one-line hook。
+> 2026-04-23 08:41 阶段 2 继续沿“输出契约清理”主线推进，新增 `BodyCandidatePartitionConservativeFixturePackageAuditValidationResult.cs`、`BodyCandidatePartitionConservativeFixturePackageAuditValidator.cs`、`BodyCandidatePartitionConservativeFixturePackageAuditValidationArtifact.cs`、`BodyCandidatePartitionConservativeFixturePackageAuditValidationArtifactBuilder.cs`、`BodyCandidatePartitionConservativeFixturePackageAuditValidationSerializer.cs`、`BodyCandidatePartitionConservativeFixturePackageAuditValidationOutputContract.cs`、`BodyCandidatePartitionConservativeFixturePackageAuditValidationOutputPaths.cs`、`BodyCandidatePartitionConservativeFixturePackageAuditValidationOutputPathResolver.cs`、`BodyCandidatePartitionConservativeFixturePackageAuditValidationWorkflowResult.cs`、`BodyCandidatePartitionConservativeFixturePackageAuditValidationWorkflow.cs`，并冻结 `BODY_CANDIDATE_PARTITION_CONSERVATIVE_FIXTURE_PACKAGE_AUDIT_VALIDATION_WORKFLOW.zh-CN.md`；阶段 2 package-audit 现已具备统一 `validation.json / validation.md` 工件链。
+> 2026-04-23 09:03 已真正接触应用入口：`AppEarlyCommandDispatcher.cs` 已确认当前只挂 `DefinitionClauseDecisionDemoAppEntry`，本轮已把 `BodyCandidatePartitionConservativeFixturePackageAuditAppEarlyCommandDispatcherHook.TryRun(...)` 接入 early-command 主链，并补上 package-audit command result 的 `JsonPath / MarkdownPath / ManifestPath / ReadmePath` 与控制台输出；下一步优先做最小 `dotnet build` / command smoke 验证，确认阶段 2 package-audit 已可通过真实应用入口触发。
+> 2026-04-23 09:11 最小 `dotnet build` 已真实触发，并暴露出 Core 既有阻塞：`DefinitionClauseDecisionBridge.cs` 与 `DefinitionClauseDecisionBridgeTierModels.cs` 同时定义了 `DefinitionClauseDecisionBridgeResult`；本轮已将 tier/mapper 链路的结果类型收敛为 `DefinitionClauseDecisionBridgeMapperResult`，避免“条款 verdict code 结果”和“tier->verdict 纯函数结果”继续重名冲突，下一步继续复跑编译确认入口接线是否通过。
+> 2026-04-23 09:16 `DefinitionClauseDecisionBridgeMapperResult` 重命名后的连锁引用已继续收敛：`DefinitionClauseDecisionBridgeEffectSnapshot.cs` 的 `DefinitionClauseDecisionBridgeAdaptedResult.Result` 已改为 mapper 结果类型，当前编译面主要回到“把 rename 波及的 adapter/fixture 全部收干净后复跑”；这一步是在真实编译栈下推进，而不是继续停留在文档侧。
+> 2026-04-23 09:21 编译栈已推进到 App 层语法面：`DefinitionClauseDecisionBridgeValidationBundleSummaryBuilder.cs` 存在未终止字符串，当前已修正 `Manifest JSON` 那一行的错误转义；下一步继续复跑编译，优先把历史语法噪声清掉，直到真正落到本轮阶段 2 package-audit 入口接线相关错误或直接编译通过。
+> 2026-04-23 09:25 编译阻塞已进一步缩到 semantic-regression 可见性边界：App 层 artifact builder 需要跨程序集读取 `DefinitionClauseDecisionSemanticRegressionSnapshotRow / Snapshot / SnapshotReportBuilder`，当前已把这三者提升为可公开访问，内部 `Catalog` 仍保持内部实现；下一步继续复跑编译，确认是否已能落回本轮阶段 2 package-audit 入口接线相关错误或直接通过。
+> 2026-04-23 09:34 编译阻塞继续沿真实错误栈收敛：`DefinitionClauseDecisionSemanticRegressionArtifactSerializer.cs` 已补齐 `WorkflowResult` 的 required 字段，`DefinitionClauseDecisionFullRunSourceCollector.cs` 已从依赖过期的 `proof.LeadClause* / proof.Parts` 顶层字段切换为基于 `proof.Result.Parts` 现算 lead-clause 摘要与 topology rewrite 标志；下一步继续复跑编译，确认 App 层陈旧 collector/serializer 是否已基本收干净。
+> 2026-04-23 09:38 App 编译栈已继续压缩到单点：`DefinitionClauseDecisionFullRunSourceCollector.cs` 新增了对 `CoreBodyProofPartResult` 的直接引用，当前已补上 `using TeklaBodyBracketRecognition.Core.Algorithms;`；下一步继续复跑 `dotnet build`，观察是否终于落回入口接线级别或直接编译通过。
+> 2026-04-23 09:42 已确认 `CoreBodyProofPartResult` 定义位于 `TeklaBodyBracketRecognition.Core.Domain`，而不是 `Core.Algorithms`；`DefinitionClauseDecisionFullRunSourceCollector.cs` 当前已改到正确命名空间，下一步继续复跑编译，观察是否终于进入阶段 2 package-audit 入口本身的真实状态验证。
+> 2026-04-23 09:46 `DefinitionClauseDecisionFullRunSourceCollector.cs` 对 `CoreBodyProofPartResult` 的剩余陈旧便捷字段依赖已继续收敛：`HasTopologyRewrite / IsCorePart / IsReviewPart` 现改为基于 `TopologyRewritePatternCode` 与 `ProofClass` 的显式判断；下一步继续复跑编译，确认 full-run collector 这一层是否已真正清干净。
+> 2026-04-23 09:50 `DefinitionClauseDecisionFullRunSourceCollector.cs` 与新 proof 模型的最后一个明显断点也已收掉：已不再依赖已消失的 `ReviewPromptZh` 字段，而是从 `Reasons` 生成退化版 review prompt；下一步继续复跑编译，观察是否终于穿过 full-run collector 这一层。
+> 2026-04-23 09:58 真实应用入口验证已通过：`AppEarlyCommandDispatcher.cs` 已接入 `BodyCandidatePartitionConservativeFixturePackageAuditAppEarlyCommandDispatcherHook.TryRun(...)`，并完成最小 `dotnet build` + `dotnet run -- --body-candidate-partition-conservative-fixture-package-audit` smoke；实际输出目录为 `I:\autoteklasuanfa\.tmpresults\body-candidate-partition-conservative-fixture-package-audit-smoke-20260423\body-candidate-partition-conservative-fixture`，当前 `TotalCount=6 / PassedCount=6 / FailedCount=0 / PackageIsComplete=True`。
+> 2026-04-23 10:09 阶段 2 package-audit 命令主链已升级为“package + validation 双输出”：`BodyCandidatePartitionConservativeFixturePackageAuditExportService.cs` 现会在同一次命令链中补写 `validation.json / validation.md`，`BodyCandidatePartitionConservativeFixturePackageAuditCommandResult.cs` 与 dispatcher console 输出也已显式回传 validation 路径与 `ValidationSucceeded`；真实 smoke 目录 `I:\autoteklasuanfa\.tmpresults\body-candidate-partition-conservative-fixture-package-audit-smoke-20260423-v2\body-candidate-partition-conservative-fixture` 下现已稳定落出 6 个工件，且 `ValidationSucceeded=True`。
+> 2026-04-23 10:22 阶段 2 validation 已提升为独立真实入口：新增 `BodyCandidatePartitionConservativeFixturePackageAuditValidationCommandResult.cs`、`BodyCandidatePartitionConservativeFixturePackageAuditValidationExportService.cs`、`BodyCandidatePartitionConservativeFixturePackageAuditValidationCommandHandler.cs`、`BodyCandidatePartitionConservativeFixturePackageAuditValidationAppEntry.cs` 与 `BodyCandidatePartitionConservativeFixturePackageAuditValidationAppEarlyCommandDispatcherHook.cs`，并已接入 `AppEarlyCommandDispatcher.cs`；最小 smoke 目录 `I:\autoteklasuanfa\.tmpresults\body-candidate-partition-conservative-fixture-package-audit-validation-smoke-20260423\body-candidate-partition-conservative-fixture` 已真实落出 6 个工件，且 `ValidationSucceeded=True`。
+> 2026-04-23 10:31 阶段 2 validation 入口之上已继续补出最小 contribution 层：新增 `BodyCandidatePartitionConservativeFixturePackageAuditValidationBundleSection*.cs`、`BodyCandidatePartitionConservativeFixturePackageAuditValidationBundleAttachment*.cs`、`BodyCandidatePartitionConservativeFixturePackageAuditValidationContribution*.cs`，并冻结 [BODY_CANDIDATE_PARTITION_CONSERVATIVE_FIXTURE_PACKAGE_AUDIT_VALIDATION_CONTRIBUTION.zh-CN.md](I:\autoteklasuanfa\BODY_CANDIDATE_PARTITION_CONSERVATIVE_FIXTURE_PACKAGE_AUDIT_VALIDATION_CONTRIBUTION.zh-CN.md)；当前阶段 2 已具备“独立 validation 命令 + 可汇总 contribution”两层稳定接口，且补层后 `dotnet build` 仍保持 0 警告 0 错误。
+> 2026-04-23 10:42 阶段 2 validation contribution 已继续提升为真实 bundle 入口：新增 `BodyCandidatePartitionConservativeFixturePackageAuditValidationBundleWorkflow.cs`、`...BundleCommandHandler.cs`、`...BundleAppEarlyCommandDispatcherHook.cs`、`...BundleManifest*.cs`、`...ContributionComposer.cs` 等，并已接入 `AppEarlyCommandDispatcher.cs`；最小 smoke 目录 `I:\autoteklasuanfa\.tmpresults\body-candidate-partition-conservative-fixture-package-audit-validation-bundle-smoke-20260423\body-candidate-partition-conservative-fixture-package-audit-validation-bundle` 已真实落出 `summary.md / README.md / manifest.json`，底下 validation 输出目录也保留 `6` 个工件，且 `ValidationSucceeded=True`。
+> 2026-04-23 11:08 阶段 2 已继续把 `validation-bundle` 之上的 aggregate 汇流入口真实落地：新增 `BodyCandidatePartitionConservativeFixtureStage2AggregateWorkflow.cs`、`...ExportService.cs`、`...CommandHandler.cs`、`...AppEarlyCommandDispatcherHook.cs`、`...Manifest*.cs`、`...ReadmeBuilder.cs` 等，并已接入 `AppEarlyCommandDispatcher.cs`；当前 aggregate workflow 已按“只跑一次 `package-audit` 主链，再复用其 command result 生成 `validation-bundle` 与 aggregate summary”收口，且最小 smoke `dotnet run -- --body-candidate-partition-conservative-fixture-stage2-aggregate --output-root .\\.tmpresults\\body-candidate-partition-conservative-fixture-stage2-aggregate-smoke-20260423` 已真实通过，输出目录 `I:\autoteklasuanfa\.tmpresults\body-candidate-partition-conservative-fixture-stage2-aggregate-smoke-20260423\body-candidate-partition-conservative-fixture-stage2-aggregate` 下现已稳定落出 `summary.md / README.md / manifest.json`，并回指 package 与 bundle 产物；同时 `dotnet build I:\autoteklasuanfa\TeklaBodyBracketRecognition.sln` 保持 `0` 警告 `0` 错误。
+> 2026-04-23 11:24 阶段 2 多入口现已开始共享统一输出骨架：新增 `BodyCandidatePartitionConservativeFixtureStage2OutputArtifactWriter.cs`，把 `summary.md / README.md / manifest.json` 的目录创建、BOM UTF-8 落盘与 JSON 缩进输出收口成共享 helper，并已让 `BodyCandidatePartitionConservativeFixturePackageAuditValidationBundleWorkflow.cs`、`BodyCandidatePartitionConservativeFixtureStage2AggregateWorkflow.cs`、`...ValidationBundleManifestSerializer.cs`、`...Stage2AggregateManifestSerializer.cs` 切到这套共用写入层；复跑 `dotnet build`、`--body-candidate-partition-conservative-fixture-package-audit-validation-bundle` 与 `--body-candidate-partition-conservative-fixture-stage2-aggregate` smoke 后均保持成功，说明阶段 2 已从“多入口各自拼输出目录”推进到“bundle / aggregate 共享同一层 artifact writer”。
+> 2026-04-23 11:36 阶段 2 的 bundle / aggregate 顶层 workflow 壳已继续共享化：新增 `BodyCandidatePartitionConservativeFixtureStage2TopLevelOutputWorkflow.cs` 与 `...TopLevelOutputWriteResult.cs`，把“写 `summary.md` -> 构造 manifest 顶层字段 -> 写 `README.md` -> 写 `manifest.json`”整段流程抽成泛型 helper，并已让 `BodyCandidatePartitionConservativeFixturePackageAuditValidationBundleWorkflow.cs` 与 `BodyCandidatePartitionConservativeFixtureStage2AggregateWorkflow.cs` 切到这套共用 workflow 壳；复跑 `dotnet build`、`--body-candidate-partition-conservative-fixture-package-audit-validation-bundle` 与 `--body-candidate-partition-conservative-fixture-stage2-aggregate` smoke 仍全部通过，说明阶段 2 已从“共享底层 artifact writer”继续推进到“共享顶层输出 workflow 壳”。
+> 2026-04-23 11:48 阶段 2 的顶层对象 contract 已继续共享化：新增 `BodyCandidatePartitionConservativeFixtureStage2TopLevelManifest.cs` 与 `...TopLevelWorkflowResult.cs`，把 `GeneratedAtUtc / OutputDirectory / SummaryMarkdownFileName / ReadmeFileName` 以及 `OutputDirectory / SummaryMarkdownPath / ReadmePath / ManifestPath` 两组顶层字段先抽成共用基类，并已让 `BodyCandidatePartitionConservativeFixturePackageAuditValidationBundleManifest.cs`、`BodyCandidatePartitionConservativeFixtureStage2AggregateManifest.cs`、`...ValidationBundleWorkflowResult.cs`、`...Stage2AggregateWorkflowResult.cs` 切到这套共享 contract；复跑 `dotnet build`、`--body-candidate-partition-conservative-fixture-package-audit-validation-bundle` 与 `--body-candidate-partition-conservative-fixture-stage2-aggregate` smoke 后仍保持成功，说明阶段 2 已从“共享 workflow 壳”继续推进到“共享顶层 manifest / workflow result 元数据 contract”。
+> 2026-04-23 12:06 阶段 2 的顶层 command result contract 已继续共享化：新增 `BodyCandidatePartitionConservativeFixtureStage2TopLevelCommandResult.cs`，把 `ExitCode / OutputDirectory / SummaryMarkdownPath / ReadmePath / ManifestPath` 先抽成 bundle / aggregate 共用基类，并已让 `BodyCandidatePartitionConservativeFixturePackageAuditValidationBundleCommandResult.cs` 与 `BodyCandidatePartitionConservativeFixtureStage2AggregateCommandResult.cs` 切到这套共享 command-result contract；复跑 `dotnet build`、`--body-candidate-partition-conservative-fixture-package-audit-validation-bundle` 与 `--body-candidate-partition-conservative-fixture-stage2-aggregate` smoke 后仍全部通过，说明阶段 2 已从“共享 manifest / workflow result contract”继续推进到“共享顶层 command result contract”。
+> 2026-04-23 12:22 阶段 2 的 command handler 解析层已继续共享化：新增 `BodyCandidatePartitionConservativeFixtureCommandHandlerSupport.cs`，把四条入口公用的“命令命中判断 + `--output-root` 解析”统一收口，并已让 `BodyCandidatePartitionConservativeFixturePackageAuditCommandHandler.cs`、`...PackageAuditValidationCommandHandler.cs`、`...PackageAuditValidationBundleCommandHandler.cs`、`...Stage2AggregateCommandHandler.cs` 全部切到这套 support；复跑 `dotnet build` 以及 `package-audit / validation / validation-bundle / stage2-aggregate` 四条 smoke 后均保持成功，说明阶段 2 已从“共享结果 contract”继续推进到“共享 command handler 解析层”。
+> 2026-04-23 12:33 阶段 2 的 dispatcher console 输出层也已完成共享化：新增 `BodyCandidatePartitionConservativeFixtureDispatcherOutputFormatter.cs`，把 header、必填/可选键值行与列表拼接输出统一收口，并已让 `BodyCandidatePartitionConservativeFixturePackageAuditAppEarlyCommandDispatcherHook.cs`、`...PackageAuditValidationAppEarlyCommandDispatcherHook.cs`、`...PackageAuditValidationBundleAppEarlyCommandDispatcherHook.cs`、`...Stage2AggregateAppEarlyCommandDispatcherHook.cs` 全部切到这套 formatter；复跑 `dotnet build` 与四条 smoke 后保持成功，说明阶段 2 这组入口的“输出壳层重复”已经基本收干净。
+> 2026-04-23 12:49 已把新的 `DefinitionClause` bridge validation bundle 真正并回旧 demo/sidecar 导出链：`DefinitionClauseDecisionSidecarWorkflow.cs` 现已新增 `WriteDefaultFixtureArtifactsWithValidationBundle(...)`，`DefinitionClauseDecisionDemoWorkflowRunner.cs` 会在旧 snapshot/summary/fixture sidecar 之外同步导出 `definition-clause-decision-bridge-validation-bundle/`，并已把 bundle 路径补进 `DefinitionClauseDecisionSidecarManifest.cs`、`DefinitionClauseDecisionDemoExportService.cs`、`DefinitionClauseDecisionDemoCommandHandler.cs`、`DefinitionClauseDecisionDemoAppEntry.cs`、`DefinitionClauseDecisionDemoOutputReadmeBuilder.cs` 与 demo validator/report；真实 smoke `dotnet run --no-build --project .\src\TeklaBodyBracketRecognition.App\TeklaBodyBracketRecognition.App.csproj -- --definition-clause-decision-demo-output .\.tmpresults\definition-clause-decision-demo-smoke-20260423-v2` 已成功，且 `definition-clause-decision-demo-validation.md/json` 已确认旧 sidecar 输出与新增 bundle 顶层/mapper/effect-adapter 工件全部存在，`AllExpectedFilesExist=True`。
+
+## 2026-04-27 纯粗拓扑观察层重建
+
+- 已在隔离分支 `codex/coarse-topology-rebuild-20260427` 上重建独立粗分类观察层。
+- 当前粗分类层已与最终 `body-family-proof` 解耦，只作为 sidecar 观察工件输出：
+  - `coarse-main-class-observation.json`
+  - `coarse-main-class-observation.zh-CN.md`
+  - `coarse-main-class-observation.xlsx`
+- 当前实现入口：
+  - [CoarseMainClassObservationModels.cs](</I:/autoteklasuanfa/src/TeklaBodyBracketRecognition.App/CoarseMainClassObservationModels.cs>)
+  - [CoarseMainClassObservationCollector.cs](</I:/autoteklasuanfa/src/TeklaBodyBracketRecognition.App/CoarseMainClassObservationCollector.cs>)
+  - [CoarseMainClassObservationArtifactBuilder.cs](</I:/autoteklasuanfa/src/TeklaBodyBracketRecognition.App/CoarseMainClassObservationArtifactBuilder.cs>)
+  - [CoarseMainClassObservationSerializer.cs](</I:/autoteklasuanfa/src/TeklaBodyBracketRecognition.App/CoarseMainClassObservationSerializer.cs>)
+  - [CoarseMainClassObservationWorkflow.cs](</I:/autoteklasuanfa/src/TeklaBodyBracketRecognition.App/CoarseMainClassObservationWorkflow.cs>)
+- 当前规则结构已经切到：
+  - 小板粗排除
+  - 主板候选集合
+  - 多切片拓扑聚合
+  - 输出 `BOX / H / PRIMARY_PLATE_BODY / NONE`
+  - 不回写最终家族结论
+- 已完成真实数据复跑：
+  - [run_body_bracket_real_06_coarse_topology_rebuild_v2](/I:/autoteklasuanfa/.tmpresults/run_body_bracket_real_06_coarse_topology_rebuild_v2)
+    - `CoarseMainClassBreakdown = H 109 / PRIMARY_PLATE_BODY 106 / BOX 56 / NONE 106`
+  - [run_body_bracket_real_04_coarse_topology_rebuild_v2](/I:/autoteklasuanfa/.tmpresults/run_body_bracket_real_04_coarse_topology_rebuild_v2)
+    - `CoarseMainClassBreakdown = H 73 / PRIMARY_PLATE_BODY 63 / BOX 37 / NONE 32`
+- 关键样本回归：
+  - `T3-2YPGL-18`
+    - `CoarseMainClass = BOX`
+    - `CandidatePartCount = 4`
+    - `BoxStationCount = 5 / EligibleStationCount = 5`
+    - `Reason = MULTI_WALL_CLOSED_LOOP_CONSENSUS`

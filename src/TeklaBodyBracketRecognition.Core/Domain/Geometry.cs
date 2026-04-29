@@ -45,6 +45,26 @@ public readonly record struct Vector3(double X, double Y, double Z)
 
 public readonly record struct Plane(Vector3 Origin, Vector3 Normal);
 
+public readonly record struct LineSegment3(Vector3 Start, Vector3 End)
+{
+    public Vector3 Direction => (End - Start).Normalize();
+
+    public double Length => (End - Start).Length;
+
+    public Vector3 Midpoint => new((Start.X + End.X) * 0.5, (Start.Y + End.Y) * 0.5, (Start.Z + End.Z) * 0.5);
+}
+
+public readonly record struct LongitudinalAxisSegment(
+    int SegmentIndex,
+    Vector3 StartPoint,
+    Vector3 EndPoint,
+    Vector3 Direction,
+    double AxisStart,
+    double AxisEnd)
+{
+    public double Length => Math.Max(AxisEnd - AxisStart, 0.0);
+}
+
 public readonly record struct BoundingBox(Vector3 Min, Vector3 Max)
 {
     public Vector3 Size => new(Max.X - Min.X, Max.Y - Min.Y, Max.Z - Min.Z);

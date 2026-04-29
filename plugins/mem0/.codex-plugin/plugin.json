@@ -1,0 +1,35 @@
+{
+  "name": "mem0",
+  "version": "0.1.0",
+  "description": "Project-specific Mem0 overlay for the autoteklasuanfa workflow.",
+  "homepage": "https://docs.mem0.ai/integrations/codex",
+  "license": "Apache-2.0",
+  "keywords": [
+    "memory",
+    "mcp",
+    "codex",
+    "mem0"
+  ],
+  "skills": "./skills/",
+  "mcpServers": "./.codex-mcp.json",
+  "interface": {
+    "displayName": "Mem0 Project Overlay",
+    "shortDescription": "Autoteklasuanfa-specific Mem0 rules",
+    "longDescription": "Adds autoteklasuanfa-specific Mem0 recovery rules on top of the global Mem0 workflow, with status-board priority and repo-scoped memory guidance.",
+    "developerName": "Local Project",
+    "category": "Productivity",
+    "capabilities": [
+      "Read",
+      "Write"
+    ],
+    "websiteURL": "https://docs.mem0.ai/integrations/codex",
+    "privacyPolicyURL": "https://mem0.ai/privacy",
+    "termsOfServiceURL": "https://mem0.ai/terms",
+    "defaultPrompt": [
+      "Recover autoteklasuanfa project memory before starting.",
+      "Sync stable autoteklasuanfa decisions to Mem0 after a milestone.",
+      "Store an autoteklasuanfa session summary before context is compacted."
+    ],
+    "brandColor": "#FF6A3D"
+  }
+}
