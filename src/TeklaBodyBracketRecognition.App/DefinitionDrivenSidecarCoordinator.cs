@@ -14,6 +14,8 @@ internal static class DefinitionDrivenSidecarCoordinator
             DefinitionClauseDecisionFullRunSourceCollector.CollectRepresentativeParts(
                 artifacts.BodyMaterialSummaries,
                 artifacts.RealInputCoreBodyProof);
+        var coarseMainClassObservationRows =
+            CoarseMainClassObservationCollector.Collect(artifacts);
         var bodyFamilyProofRows =
             BodyFamilyDefinitionEvaluator.Evaluate(
                 definitionClauseDecisionAssemblies);
@@ -28,6 +30,9 @@ internal static class DefinitionDrivenSidecarCoordinator
                 outputDirectory,
                 definitionClauseDecisionAssemblies,
                 definitionClauseDecisionRepresentativeParts),
+            CoarseMainClassObservation = CoarseMainClassObservationWorkflow.Run(
+                outputDirectory,
+                coarseMainClassObservationRows),
             BodyFamilyProof = BodyFamilyProofWorkflow.Run(
                 outputDirectory,
                 bodyFamilyProofRows),

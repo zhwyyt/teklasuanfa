@@ -67,7 +67,8 @@ public sealed class BodyCandidatePartitioner
     {
         var projectedInterval = EstimateProjectedInterval(part, provisionalBodyAxisSegments, provisionalBodyAxis);
         var coverage = EstimateLongitudinalCoverage(projectedInterval, assemblySpan);
-        var nearStableZone = !IsSingleEndedLocalPart(part);
+        var endProximity = EstimateEndProximity(projectedInterval, assemblySpan);
+        var nearStableZone = !IsSingleEndedLocalPart(endProximity.NearStart, endProximity.NearEnd);
         var reasons = new List<string>();
         var isInputMainPart = part.PartId == inputMainPartId;
 
@@ -76,17 +77,22 @@ public sealed class BodyCandidatePartitioner
 
         if (part.IsSpecialShape || part.RuntimeType == RuntimePartType.BentPlate)
         {
-            if (part.RuntimeType == RuntimePartType.PolyBeam &&
-                part.IsPlateLike &&
-                coverage >= 0.80 &&
-                nearStableZone &&
-                (IsPrimaryBodyRole(part.SemanticRole) || part.OuterSideCandidate))
+            if (ShouldPromoteSpecialShapeToBodyCandidate(
+                    part,
+                    coverage,
+                    nearStableZone,
+                    isInputMainPart,
+                    isInInputMainComponent))
             {
                 partitionClass = BodyCandidatePartitionClass.BodyCandidate;
-                confidence = IsPrimaryBodyRole(part.SemanticRole) ? 0.78 : 0.66;
+                confidence = isInputMainPart
+                    ? 0.82
+                    : IsPrimaryBodyRole(part.SemanticRole)
+                        ? 0.78
+                        : 0.68;
                 reasons.Add("SPECIAL_SHAPE_LONGITUDINAL_BODY_CANDIDATE");
                 reasons.Add("LOW_CONFIDENCE_PARTITION");
-                if (IsPrimaryBodyRole(part.SemanticRole) || part.OuterSideCandidate)
+                if (IsPrimaryBodyRole(part.SemanticRole) || part.OuterSideCandidate || isInputMainPart)
                 {
                     reasons.Add("LIKELY_MAIN_SECTION_PART");
                 }
@@ -153,14 +159,32 @@ public sealed class BodyCandidatePartitioner
         }
         else if (isInputMainPart && IsPrimaryBodyRole(part.SemanticRole))
         {
-            partitionClass = BodyCandidatePartitionClass.BodyCandidate;
-            confidence = Math.Min(0.92, 0.76 + (0.12 * part.SemanticRoleScore));
-            reasons.Add("LIKELY_MAIN_SECTION_PART");
-            reasons.Add("LOW_CONFIDENCE_PARTITION");
-            reasons.Add("INPUT_MAIN_PART");
-            if (!nearStableZone)
+            if (coverage >= 0.20)
             {
+                partitionClass = BodyCandidatePartitionClass.BodyCandidate;
+                confidence = Math.Min(0.90, 0.70 + (0.25 * Math.Min(1.0, coverage)) + (0.08 * part.SemanticRoleScore));
+                reasons.Add("LIKELY_MAIN_SECTION_PART");
+                reasons.Add("LOW_CONFIDENCE_PARTITION");
+                reasons.Add("INPUT_MAIN_PART");
+                if (!nearStableZone)
+                {
+                    reasons.Add("NEAR_END_LOCAL_PART");
+                }
+            }
+            else if (nearStableZone)
+            {
+                partitionClass = BodyCandidatePartitionClass.BodyAccessoryCandidate;
+                confidence = 0.60;
+                reasons.Add("INPUT_MAIN_PART");
+                reasons.Add("LOW_CONFIDENCE_PARTITION");
+            }
+            else
+            {
+                partitionClass = BodyCandidatePartitionClass.LocalStiffenerCandidate;
+                confidence = 0.70;
+                reasons.Add("INPUT_MAIN_PART");
                 reasons.Add("NEAR_END_LOCAL_PART");
+                reasons.Add("LOW_CONFIDENCE_PARTITION");
             }
         }
         else if (IsPrimaryBodyRole(part.SemanticRole))
@@ -234,10 +258,49 @@ public sealed class BodyCandidatePartitioner
         };
     }
 
+    private static bool ShouldPromoteSpecialShapeToBodyCandidate(
+        PartFeature part,
+        double coverage,
+        bool nearStableZone,
+        bool isInputMainPart,
+        bool isInInputMainComponent)
+    {
+        if (!isInInputMainComponent || !part.IsPlateLike || part.IsTinyPart || !nearStableZone)
+        {
+            return false;
+        }
+
+        if (coverage >= 0.55)
+        {
+            return true;
+        }
+
+        var hasBodyRoleSignal =
+            isInputMainPart ||
+            IsPrimaryBodyRole(part.SemanticRole) ||
+            part.OuterSideCandidate;
+        if (!hasBodyRoleSignal)
+        {
+            return false;
+        }
+
+        return isInputMainPart &&
+               IsPrimaryBodyRole(part.SemanticRole) &&
+               coverage >= 0.35;
+    }
+
     private static Vector3 EstimateBodyAxis(IReadOnlyList<PartFeature> parts, int inputMainPartId)
     {
+        var nonTinyParts = parts
+            .Where(part => !part.IsTinyPart)
+            .ToArray();
+        var referenceLength = nonTinyParts.Length > 0
+            ? nonTinyParts.Max(GetPrimaryLength)
+            : 0.0;
         var preferred = parts.FirstOrDefault(part => part.PartId == inputMainPartId);
-        if (preferred is not null && preferred.PlateLongDirection.Length > 1e-6)
+        if (preferred is not null &&
+            preferred.PlateLongDirection.Length > 1e-6 &&
+            (referenceLength <= 1e-6 || GetPrimaryLength(preferred) >= referenceLength * 0.60))
         {
             var axis = preferred.PlateLongDirection.Normalize();
             if (axis.Length > 1e-6)
@@ -246,9 +309,9 @@ public sealed class BodyCandidatePartitioner
             }
         }
 
-        var fallback = parts
-            .Where(part => !part.IsTinyPart)
-            .OrderByDescending(part => IsPrimaryBodyRole(part.SemanticRole))
+        var fallback = nonTinyParts
+            .OrderByDescending(part => GetPrimaryLength(part))
+            .ThenByDescending(part => IsPrimaryBodyRole(part.SemanticRole))
             .ThenByDescending(part => GetPrimaryLength(part))
             .FirstOrDefault();
 
@@ -282,14 +345,33 @@ public sealed class BodyCandidatePartitioner
         var primaryBodyParts = usableParts
             .Where(part => IsPrimaryBodyRole(part.SemanticRole))
             .ToArray();
-        var anchoredParts = usableParts
-            .Where(part => part.PartId == inputMainPartId || !IsSingleEndedLocalPart(part))
+        var usableIntervals = usableParts
+            .Select(part => EstimateProjectedInterval(part, BuildSingleAxisSegment(axis, usableParts), axis))
             .ToArray();
-        var spanSource = primaryBodyParts.Length > 0
-            ? primaryBodyParts
-            : anchoredParts.Length > 0
-                ? anchoredParts
-                : usableParts;
+        var usableSpanMin = usableIntervals.Min(item => item.Min);
+        var usableSpanMax = usableIntervals.Max(item => item.Max);
+        var usableAssemblySpan = Math.Max(usableSpanMax - usableSpanMin, 1.0);
+        var anchoredParts = usableParts
+            .Where(
+                part =>
+                {
+                    if (part.PartId == inputMainPartId)
+                    {
+                        return true;
+                    }
+
+                    var interval = TranslateIntervalToAssemblyOrigin(
+                        EstimateProjectedInterval(part, BuildSingleAxisSegment(axis, usableParts), axis),
+                        usableSpanMin);
+                    var endProximity = EstimateEndProximity(interval, usableAssemblySpan);
+                    return !IsSingleEndedLocalPart(endProximity.NearStart, endProximity.NearEnd);
+                })
+            .ToArray();
+        var spanSource = SelectSpanSourceParts(
+            primaryBodyParts,
+            anchoredParts,
+            usableParts,
+            part => EstimateProjectedInterval(part, BuildSingleAxisSegment(axis, usableParts), axis));
 
         var intervals = spanSource
             .Select(part => EstimateProjectedInterval(part, BuildSingleAxisSegment(axis, spanSource), axis))
@@ -332,14 +414,33 @@ public sealed class BodyCandidatePartitioner
         var primaryBodyParts = usableParts
             .Where(part => IsPrimaryBodyRole(part.SemanticRole))
             .ToArray();
-        var anchoredParts = usableParts
-            .Where(part => part.PartId == inputMainPartId || !IsSingleEndedLocalPart(part))
+        var usableIntervals = usableParts
+            .Select(part => EstimateProjectedInterval(part, axisSegments, axis))
             .ToArray();
-        var spanSource = primaryBodyParts.Length > 0
-            ? primaryBodyParts
-            : anchoredParts.Length > 0
-                ? anchoredParts
-                : usableParts;
+        var usableSpanMin = usableIntervals.Min(item => item.Min);
+        var usableSpanMax = usableIntervals.Max(item => item.Max);
+        var usableAssemblySpan = Math.Max(usableSpanMax - usableSpanMin, 1.0);
+        var anchoredParts = usableParts
+            .Where(
+                part =>
+                {
+                    if (part.PartId == inputMainPartId)
+                    {
+                        return true;
+                    }
+
+                    var interval = TranslateIntervalToAssemblyOrigin(
+                        EstimateProjectedInterval(part, axisSegments, axis),
+                        usableSpanMin);
+                    var endProximity = EstimateEndProximity(interval, usableAssemblySpan);
+                    return !IsSingleEndedLocalPart(endProximity.NearStart, endProximity.NearEnd);
+                })
+            .ToArray();
+        var spanSource = SelectSpanSourceParts(
+            primaryBodyParts,
+            anchoredParts,
+            usableParts,
+            part => EstimateProjectedInterval(part, axisSegments, axis));
 
         var intervals = spanSource
             .Select(part => EstimateProjectedInterval(part, axisSegments, axis))
@@ -347,6 +448,43 @@ public sealed class BodyCandidatePartitioner
 
         var span = intervals.Max(item => item.Max) - intervals.Min(item => item.Min);
         return Math.Max(span, 1.0);
+    }
+
+    private static IReadOnlyList<PartFeature> SelectSpanSourceParts(
+        IReadOnlyList<PartFeature> primaryBodyParts,
+        IReadOnlyList<PartFeature> anchoredParts,
+        IReadOnlyList<PartFeature> usableParts,
+        Func<PartFeature, (double Min, double Max)> intervalSelector)
+    {
+        if (primaryBodyParts.Count == 0)
+        {
+            return anchoredParts.Count > 0 ? anchoredParts : usableParts;
+        }
+
+        var primarySpan = EstimateIntervalSpan(primaryBodyParts, intervalSelector);
+        var anchoredSpan = anchoredParts.Count > 0 ? EstimateIntervalSpan(anchoredParts, intervalSelector) : 0.0;
+        var usableSpan = EstimateIntervalSpan(usableParts, intervalSelector);
+        var referenceSpan = Math.Max(anchoredSpan, usableSpan);
+
+        if (referenceSpan <= 1e-6 || primarySpan >= referenceSpan * 0.60)
+        {
+            return primaryBodyParts;
+        }
+
+        return anchoredParts.Count > 0 ? anchoredParts : usableParts;
+    }
+
+    private static double EstimateIntervalSpan(
+        IReadOnlyList<PartFeature> parts,
+        Func<PartFeature, (double Min, double Max)> intervalSelector)
+    {
+        if (parts.Count == 0)
+        {
+            return 0.0;
+        }
+
+        var intervals = parts.Select(intervalSelector).ToArray();
+        return Math.Max(intervals.Max(item => item.Max) - intervals.Min(item => item.Min), 0.0);
     }
 
     private static (double Min, double Max) EstimateProjectedInterval(
@@ -403,8 +541,30 @@ public sealed class BodyCandidatePartitioner
         return visited;
     }
 
-    private static bool IsSingleEndedLocalPart(PartFeature part) =>
-        part.NearMemberStart ^ part.NearMemberEnd;
+    private static (bool NearStart, bool NearEnd) EstimateEndProximity(
+        (double Min, double Max) projectedInterval,
+        double assemblySpan)
+    {
+        if (assemblySpan <= 1e-6)
+        {
+            return (false, false);
+        }
+
+        var tolerance = assemblySpan * 0.05;
+        var nearStart = projectedInterval.Min <= tolerance;
+        var nearEnd = projectedInterval.Max >= assemblySpan - tolerance;
+        return (nearStart, nearEnd);
+    }
+
+    private static bool IsSingleEndedLocalPart(bool nearStart, bool nearEnd) =>
+        nearStart ^ nearEnd;
+
+    private static (double Min, double Max) TranslateIntervalToAssemblyOrigin(
+        (double Min, double Max) projectedInterval,
+        double assemblyMin)
+    {
+        return (projectedInterval.Min - assemblyMin, projectedInterval.Max - assemblyMin);
+    }
 
     private static bool HasUsableSpanGeometry(PartFeature part, IReadOnlyList<LongitudinalAxisSegment> axisSegments, Vector3 axis)
     {
@@ -420,7 +580,7 @@ public sealed class BodyCandidatePartitioner
         int inputMainPartId,
         Vector3 fallbackAxis)
     {
-        var candidates = parts
+        var rawCandidates = parts
             .Where(HasUsableGuideSegments)
             .Select(
                 part => new
@@ -437,10 +597,26 @@ public sealed class BodyCandidatePartitioner
                     ProgressRatio = EstimateProgressRatio(item.Polyline, fallbackAxis)
                 })
             .Where(item => item.Polyline.Count >= 2 && item.Length > 1e-3)
+            .ToArray();
+
+        var maxLength = rawCandidates.Length > 0
+            ? rawCandidates.Max(item => item.Length)
+            : 0.0;
+        var candidates = rawCandidates
+            .Select(
+                item => new
+                {
+                    item.Part,
+                    item.Polyline,
+                    item.Length,
+                    item.ProgressRatio,
+                    LengthRatio = maxLength <= 1e-6 ? 0.0 : item.Length / maxLength,
+                    ComparableToLongest = maxLength <= 1e-6 || item.Length >= maxLength * 0.60
+                })
             .OrderByDescending(item => item.ProgressRatio)
             .ThenByDescending(item => item.Length)
-            .ThenByDescending(item => item.Part.PartId == inputMainPartId)
-            .ThenByDescending(item => IsPrimaryBodyRole(item.Part.SemanticRole))
+            .ThenByDescending(item => item.ComparableToLongest && item.Part.PartId == inputMainPartId)
+            .ThenByDescending(item => item.ComparableToLongest && IsPrimaryBodyRole(item.Part.SemanticRole))
             .ToArray();
 
         if (candidates.Length == 0)
@@ -503,7 +679,8 @@ public sealed class BodyCandidatePartitioner
     }
 
     private static bool HasUsableGuideSegments(PartFeature part) =>
-        part.SolidEdges.Count > 0 && part.RuntimeType == RuntimePartType.PolyBeam;
+        part.SolidEdges.Count > 0 &&
+        (part.RuntimeType == RuntimePartType.PolyBeam || part.RuntimeType == RuntimePartType.Beam);
 
     private static IReadOnlyList<Vector3> BuildGuidePolyline(PartFeature part)
     {
