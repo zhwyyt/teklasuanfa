@@ -54,47 +54,45 @@ public sealed class SectionTraceExtractor
                     continue;
                 }
 
-                if (!TryResolveTraceGeometry(
+                if (!TryResolveTraceGeometries(
                         part,
                         station.AxisPosition,
                         sectionPlanePoint,
                         sectionAxisX,
                         sectionAxisY,
                         sectionAxisZ,
-                        out var centerY,
-                        out var centerZ,
-                        out var startY,
-                        out var startZ,
-                        out var endY,
-                        out var endZ,
-                        out var traceReason))
+                        out var traceGeometries))
                 {
                     continue;
                 }
 
-                segments.Add(
-                    new SectionTraceSegment
-                    {
-                        TraceId = $"{station.StationId}-part-{part.PartId}",
-                        StationId = station.StationId,
-                        PartId = part.PartId,
-                        PartName = string.IsNullOrWhiteSpace(part.Name) ? "<unnamed>" : part.Name,
-                        ProfileString = part.ProfileString,
-                        PartitionClass = partitionLookup[part.PartId].PartitionClass,
-                        CenterY = Math.Round(centerY, 3),
-                        CenterZ = Math.Round(centerZ, 3),
-                        StartY = Math.Round(startY, 3),
-                        StartZ = Math.Round(startZ, 3),
-                        EndY = Math.Round(endY, 3),
-                        EndZ = Math.Round(endZ, 3),
-                        WidthLength = Math.Round(Math.Sqrt(Math.Pow(endY - startY, 2) + Math.Pow(endZ - startZ, 2)), 3),
-                        Reasons = new[]
+                for (var geometryIndex = 0; geometryIndex < traceGeometries.Count; geometryIndex++)
+                {
+                    var geometry = traceGeometries[geometryIndex];
+                    segments.Add(
+                        new SectionTraceSegment
                         {
-                            "SECTION_TRACE_FROM_PART_GEOMETRY",
-                            traceReason,
-                            $"PARTITION_{partitionLookup[part.PartId].PartitionClass}"
-                        }
-                });
+                            TraceId = $"{station.StationId}-part-{part.PartId}-edge-{geometryIndex + 1:00}",
+                            StationId = station.StationId,
+                            PartId = part.PartId,
+                            PartName = string.IsNullOrWhiteSpace(part.Name) ? "<unnamed>" : part.Name,
+                            ProfileString = part.ProfileString,
+                            PartitionClass = partitionLookup[part.PartId].PartitionClass,
+                            CenterY = Math.Round(geometry.CenterY, 3),
+                            CenterZ = Math.Round(geometry.CenterZ, 3),
+                            StartY = Math.Round(geometry.StartY, 3),
+                            StartZ = Math.Round(geometry.StartZ, 3),
+                            EndY = Math.Round(geometry.EndY, 3),
+                            EndZ = Math.Round(geometry.EndZ, 3),
+                            WidthLength = Math.Round(Math.Sqrt(Math.Pow(geometry.EndY - geometry.StartY, 2) + Math.Pow(geometry.EndZ - geometry.StartZ, 2)), 3),
+                            Reasons = new[]
+                            {
+                                "SECTION_TRACE_FROM_PART_GEOMETRY",
+                                geometry.Reason,
+                                $"PARTITION_{partitionLookup[part.PartId].PartitionClass}"
+                            }
+                    });
+                }
             }
 
             stations.Add(
@@ -155,48 +153,39 @@ public sealed class SectionTraceExtractor
         return segment.StartPoint + (segment.Direction * local);
     }
 
-    private bool TryResolveTraceGeometry(
+    private sealed record TraceGeometry(
+        double CenterY,
+        double CenterZ,
+        double StartY,
+        double StartZ,
+        double EndY,
+        double EndZ,
+        string Reason);
+
+    private bool TryResolveTraceGeometries(
         PartFeature part,
         double stationAxisPosition,
         Vector3 sectionPlanePoint,
         Vector3 sectionAxisX,
         Vector3 sectionAxisY,
         Vector3 sectionAxisZ,
-        out double centerY,
-        out double centerZ,
-        out double startY,
-        out double startZ,
-        out double endY,
-        out double endZ,
-        out string traceReason)
+        out IReadOnlyList<TraceGeometry> traceGeometries)
     {
-        if (TryResolveTraceFromSolidEdges(
+        if (TryResolveTraceGeometriesFromSolidEdges(
                 part,
                 stationAxisPosition,
                 sectionPlanePoint,
                 sectionAxisX,
                 sectionAxisY,
                 sectionAxisZ,
-                out centerY,
-                out centerZ,
-                out startY,
-                out startZ,
-                out endY,
-                out endZ))
+                out traceGeometries))
         {
-            traceReason = "SECTION_TRACE_USING_SOLID_EDGE_INTERSECTION";
             return true;
         }
 
         if (!TryResolveTraceVectorAndSpan(part, sectionAxisX, out var traceVector, out var traceLength, out var vectorReason))
         {
-            centerY = 0d;
-            centerZ = 0d;
-            startY = 0d;
-            startZ = 0d;
-            endY = 0d;
-            endZ = 0d;
-            traceReason = string.Empty;
+            traceGeometries = Array.Empty<TraceGeometry>();
             return false;
         }
 
@@ -207,16 +196,26 @@ public sealed class SectionTraceExtractor
             sectionAxisX,
             sectionAxisY,
             sectionAxisZ,
-            out centerY,
-            out centerZ);
+            out var centerY,
+            out var centerZ);
         var halfSpan = Math.Max(Math.Abs(traceLength) * 0.5, 1.0);
         var traceY = traceVector.Dot(sectionAxisY);
         var traceZ = traceVector.Dot(sectionAxisZ);
-        startY = centerY - (traceY * halfSpan);
-        startZ = centerZ - (traceZ * halfSpan);
-        endY = centerY + (traceY * halfSpan);
-        endZ = centerZ + (traceZ * halfSpan);
-        traceReason = vectorReason;
+        var startY = centerY - (traceY * halfSpan);
+        var startZ = centerZ - (traceZ * halfSpan);
+        var endY = centerY + (traceY * halfSpan);
+        var endZ = centerZ + (traceZ * halfSpan);
+        traceGeometries =
+        [
+            new TraceGeometry(
+                centerY,
+                centerZ,
+                startY,
+                startZ,
+                endY,
+                endZ,
+                vectorReason)
+        ];
         return true;
     }
 
@@ -360,29 +359,19 @@ public sealed class SectionTraceExtractor
         return bestVector.Normalize();
     }
 
-    private bool TryResolveTraceFromSolidEdges(
+    private bool TryResolveTraceGeometriesFromSolidEdges(
         PartFeature part,
         double stationAxisPosition,
         Vector3 sectionPlanePoint,
         Vector3 sectionAxisX,
         Vector3 sectionAxisY,
         Vector3 sectionAxisZ,
-        out double centerY,
-        out double centerZ,
-        out double startY,
-        out double startZ,
-        out double endY,
-        out double endZ)
+        out IReadOnlyList<TraceGeometry> traceGeometries)
     {
         var edges = part.SolidEdges;
         if (edges.Count == 0)
         {
-            centerY = 0d;
-            centerZ = 0d;
-            startY = 0d;
-            startZ = 0d;
-            endY = 0d;
-            endZ = 0d;
+            traceGeometries = Array.Empty<TraceGeometry>();
             return false;
         }
 
@@ -396,12 +385,7 @@ public sealed class SectionTraceExtractor
         var uniquePoints = DeduplicatePoints(worldPoints, pointTolerance);
         if (uniquePoints.Count < 2)
         {
-            centerY = 0d;
-            centerZ = 0d;
-            startY = 0d;
-            startZ = 0d;
-            endY = 0d;
-            endZ = 0d;
+            traceGeometries = Array.Empty<TraceGeometry>();
             return false;
         }
 
@@ -417,47 +401,107 @@ public sealed class SectionTraceExtractor
         var direction = ResolveTraceDirectionFromPoints(part, sectionAxisX, yzPoints);
         if (direction.Length <= 1e-6)
         {
-            centerY = 0d;
-            centerZ = 0d;
-            startY = 0d;
-            startZ = 0d;
-            endY = 0d;
-            endZ = 0d;
+            traceGeometries = Array.Empty<TraceGeometry>();
             return false;
         }
 
+        traceGeometries = BuildTraceGeometriesFromPointClusters(direction, yzPoints, pointTolerance, "SECTION_TRACE_USING_SOLID_EDGE_INTERSECTION");
+        return traceGeometries.Count > 0;
+    }
+
+    private static IReadOnlyList<TraceGeometry> BuildTraceGeometriesFromPointClusters(
+        Vector3 direction,
+        IReadOnlyList<dynamic> yzPoints,
+        double pointTolerance,
+        string reason)
+    {
         var alongAxis = direction;
         var normalAxis = new Vector3(-alongAxis.Y, alongAxis.X, 0d);
-        var alongValues = yzPoints
-            .Select(point => (point.Y * alongAxis.X) + (point.Z * alongAxis.Y))
-            .ToArray();
-        var normalValues = yzPoints
-            .Select(point => (point.Y * normalAxis.X) + (point.Z * normalAxis.Y))
+        var clusteredPoints = yzPoints
+            .Select(
+                point => new PointProjection(
+                    (double)point.Y,
+                    (double)point.Z,
+                    (((double)point.Y * alongAxis.X) + ((double)point.Z * alongAxis.Y)),
+                    (((double)point.Y * normalAxis.X) + ((double)point.Z * normalAxis.Y))))
+            .OrderBy(item => item.Normal)
+            .ThenBy(item => item.Along)
             .ToArray();
 
-        var minAlong = alongValues.Min();
-        var maxAlong = alongValues.Max();
-        if (maxAlong - minAlong <= 1e-6)
+        var clusters = new List<List<PointProjection>>();
+        var clusterTolerance = Math.Max(pointTolerance * 6.0, 6.0);
+        foreach (var point in clusteredPoints)
         {
-            centerY = 0d;
-            centerZ = 0d;
-            startY = 0d;
-            startZ = 0d;
-            endY = 0d;
-            endZ = 0d;
-            return false;
+            var cluster = clusters.FirstOrDefault(item => Math.Abs(item.Average(existing => existing.Normal) - point.Normal) <= clusterTolerance);
+            if (cluster is null)
+            {
+                clusters.Add([point]);
+                continue;
+            }
+
+            cluster.Add(point);
         }
 
-        var centerAlong = (minAlong + maxAlong) * 0.5d;
-        var centerNormal = normalValues.Average();
-        centerY = (alongAxis.X * centerAlong) + (normalAxis.X * centerNormal);
-        centerZ = (alongAxis.Y * centerAlong) + (normalAxis.Y * centerNormal);
-        startY = (alongAxis.X * minAlong) + (normalAxis.X * centerNormal);
-        startZ = (alongAxis.Y * minAlong) + (normalAxis.Y * centerNormal);
-        endY = (alongAxis.X * maxAlong) + (normalAxis.X * centerNormal);
-        endZ = (alongAxis.Y * maxAlong) + (normalAxis.Y * centerNormal);
-        return true;
+        var geometries = clusters
+            .Where(cluster => cluster.Count >= 2)
+            .Select(
+                cluster =>
+                {
+                    var minAlong = cluster.Min(item => item.Along);
+                    var maxAlong = cluster.Max(item => item.Along);
+                    var span = maxAlong - minAlong;
+                    if (span <= Math.Max(pointTolerance * 2.0, 1.0))
+                    {
+                        return null;
+                    }
+
+                    var centerAlong = (minAlong + maxAlong) * 0.5d;
+                    var centerNormal = cluster.Average(item => item.Normal);
+                    var centerY = (alongAxis.X * centerAlong) + (normalAxis.X * centerNormal);
+                    var centerZ = (alongAxis.Y * centerAlong) + (normalAxis.Y * centerNormal);
+                    var startY = (alongAxis.X * minAlong) + (normalAxis.X * centerNormal);
+                    var startZ = (alongAxis.Y * minAlong) + (normalAxis.Y * centerNormal);
+                    var endY = (alongAxis.X * maxAlong) + (normalAxis.X * centerNormal);
+                    var endZ = (alongAxis.Y * maxAlong) + (normalAxis.Y * centerNormal);
+                    return new TraceGeometry(centerY, centerZ, startY, startZ, endY, endZ, reason);
+                })
+            .Where(static item => item is not null)
+            .Cast<TraceGeometry>()
+            .OrderByDescending(item => Math.Sqrt(Math.Pow(item.EndY - item.StartY, 2) + Math.Pow(item.EndZ - item.StartZ, 2)))
+            .ThenBy(item => item.CenterY)
+            .ThenBy(item => item.CenterZ)
+            .ToArray();
+
+        if (geometries.Length > 0)
+        {
+            return geometries;
+        }
+
+        var alongValues = clusteredPoints.Select(item => item.Along).ToArray();
+        var normalValues = clusteredPoints.Select(item => item.Normal).ToArray();
+        var fallbackMinAlong = alongValues.Min();
+        var fallbackMaxAlong = alongValues.Max();
+        if (fallbackMaxAlong - fallbackMinAlong <= 1e-6)
+        {
+            return Array.Empty<TraceGeometry>();
+        }
+
+        var fallbackCenterAlong = (fallbackMinAlong + fallbackMaxAlong) * 0.5d;
+        var fallbackCenterNormal = normalValues.Average();
+        return
+        [
+            new TraceGeometry(
+                (alongAxis.X * fallbackCenterAlong) + (normalAxis.X * fallbackCenterNormal),
+                (alongAxis.Y * fallbackCenterAlong) + (normalAxis.Y * fallbackCenterNormal),
+                (alongAxis.X * fallbackMinAlong) + (normalAxis.X * fallbackCenterNormal),
+                (alongAxis.Y * fallbackMinAlong) + (normalAxis.Y * fallbackCenterNormal),
+                (alongAxis.X * fallbackMaxAlong) + (normalAxis.X * fallbackCenterNormal),
+                (alongAxis.Y * fallbackMaxAlong) + (normalAxis.Y * fallbackCenterNormal),
+                reason)
+        ];
     }
+
+    private sealed record PointProjection(double Y, double Z, double Along, double Normal);
 
     private static bool TryResolveTraceVectorAndSpan(
         PartFeature part,

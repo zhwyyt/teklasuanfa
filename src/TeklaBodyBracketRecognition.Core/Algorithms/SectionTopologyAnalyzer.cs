@@ -66,11 +66,23 @@ public sealed class SectionTopologyAnalyzer
         var minZ = retained.Min(item => Math.Min(item.StartZ, item.EndZ));
         var maxZ = retained.Max(item => Math.Max(item.StartZ, item.EndZ));
         var envelopeTolerance = Math.Max(_options.ContactDistanceToleranceMm * 2.0, 8.0);
+        var bodyCandidates = retained
+            .Where(item => item.PartitionClass == BodyCandidatePartitionClass.BodyCandidate)
+            .ToArray();
 
         var outerEnvelope = retained
             .Where(item => TouchesEnvelope(item, minY, maxY, minZ, maxZ, envelopeTolerance))
             .Select(item => item.TraceId)
             .ToArray();
+        if (outerEnvelope.Length < 4 &&
+            bodyCandidates.Length >= 4 &&
+            SectionClosedLoopEvidence.SupportsExtendedLineLoop(bodyCandidates, minY, maxY, minZ, maxZ, envelopeTolerance))
+        {
+            outerEnvelope = bodyCandidates
+                .Select(item => item.TraceId)
+                .ToArray();
+        }
+
         var outerLookup = outerEnvelope.ToHashSet(StringComparer.Ordinal);
         var internalTraceIds = retained
             .Where(item => !outerLookup.Contains(item.TraceId))

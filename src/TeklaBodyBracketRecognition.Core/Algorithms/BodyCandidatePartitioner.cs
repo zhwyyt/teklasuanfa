@@ -213,12 +213,32 @@ public sealed class BodyCandidatePartitioner
                 reasons.Add("LOW_CONFIDENCE_PARTITION");
             }
         }
-        else if (part.IsPlateLike && coverage >= 0.40 && nearStableZone)
+        else if (ShouldPromoteGenericPlateToBodyCandidate(
+                     part,
+                     coverage,
+                     nearStableZone,
+                     isInputMainPart,
+                     isInInputMainComponent))
         {
             partitionClass = BodyCandidatePartitionClass.BodyCandidate;
-            confidence = 0.58;
+            confidence = ResolveGenericPlateCandidateConfidence(part, coverage, nearStableZone, isInputMainPart);
+            reasons.Add("LONGITUDINAL_STRUCTURAL_PLATE_CANDIDATE");
             reasons.Add("LIKELY_MAIN_SECTION_PART");
             reasons.Add("LOW_CONFIDENCE_PARTITION");
+            if (part.OuterSideCandidate)
+            {
+                reasons.Add("OUTER_SIDE_PLATE_SIGNAL");
+            }
+
+            if (HasStrongThicknessSignal(part))
+            {
+                reasons.Add("THICK_PLATE_SIGNAL");
+            }
+
+            if (!nearStableZone)
+            {
+                reasons.Add("SINGLE_ENDED_BUT_LONGITUDINAL");
+            }
         }
         else if (part.IsPlateLike && coverage >= 0.25)
         {
@@ -287,6 +307,85 @@ public sealed class BodyCandidatePartitioner
         return isInputMainPart &&
                IsPrimaryBodyRole(part.SemanticRole) &&
                coverage >= 0.35;
+    }
+
+    private static bool ShouldPromoteGenericPlateToBodyCandidate(
+        PartFeature part,
+        double coverage,
+        bool nearStableZone,
+        bool isInputMainPart,
+        bool isInInputMainComponent)
+    {
+        if (!isInInputMainComponent ||
+            !part.IsPlateLike ||
+            part.IsSpecialShape ||
+            part.IsTinyPart ||
+            part.LikelyConnectionPart)
+        {
+            return false;
+        }
+
+        if (part.SemanticRole is PartSemanticRole.EndPlateCandidate or PartSemanticRole.StiffenerCandidate)
+        {
+            return false;
+        }
+
+        if (coverage >= 0.55)
+        {
+            return true;
+        }
+
+        var hasStructuralSignal =
+            isInputMainPart ||
+            part.OuterSideCandidate ||
+            HasStrongThicknessSignal(part) ||
+            part.AspectRatio >= 3.0;
+        if (!hasStructuralSignal)
+        {
+            return false;
+        }
+
+        if (coverage >= 0.35)
+        {
+            return true;
+        }
+
+        return nearStableZone && coverage >= 0.28;
+    }
+
+    private static bool HasStrongThicknessSignal(PartFeature part)
+    {
+        return (part.Thickness ?? 0d) >= 10d;
+    }
+
+    private static double ResolveGenericPlateCandidateConfidence(
+        PartFeature part,
+        double coverage,
+        bool nearStableZone,
+        bool isInputMainPart)
+    {
+        var confidence = 0.56 + (0.18 * Math.Min(1.0, coverage));
+        if (part.OuterSideCandidate)
+        {
+            confidence += 0.06;
+        }
+
+        if (HasStrongThicknessSignal(part))
+        {
+            confidence += 0.05;
+        }
+
+        if (isInputMainPart)
+        {
+            confidence += 0.04;
+        }
+
+        if (!nearStableZone)
+        {
+            confidence -= 0.04;
+        }
+
+        return Math.Clamp(confidence, 0.52, 0.82);
     }
 
     private static Vector3 EstimateBodyAxis(IReadOnlyList<PartFeature> parts, int inputMainPartId)
