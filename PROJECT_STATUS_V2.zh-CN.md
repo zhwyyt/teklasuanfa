@@ -44,13 +44,15 @@
 
 ## 当前工作分支
 
-- `codex/work-variable-section-proof-20260428`
+- `codex/foundation-health-audit-sidecar-contract-20260429`
 
 说明：
 
 - 当前将其视为“唯一活跃正式工作分支”
-- 主题聚焦为：变截面 `H / BOX` 的 proof 收敛与家族映射边界
+- 主题聚焦为：基础几何健康检查 sidecar 输出契约与第一轮 member-level summary
 - 其它历史实验分支仅保留为参考，不再并行开发
+- 已合并分支 `codex/work-variable-section-proof-20260428` 已进入 `main`，远端分支已删除
+- sidecar 实现草稿仍保留在本地 stash 中，后续只作为参考恢复
 
 ---
 
@@ -196,6 +198,27 @@
        - 观察层把 `H` 组织关系写死在坐标朝向里
        - 候选层没有把长向 `SpecialShape` 主板纳入粗分类观察
    - 当前剩余最集中的阻塞样本已进一步收缩到：
+11. `2026-04-30` 已在主体候选层完成一轮“宽收长向结构板、强排明显小板”的收口验证：
+   - [BodyCandidatePartitioner.cs](</I:/autoteklasuanfa/src/TeklaBodyBracketRecognition.Core/Algorithms/BodyCandidatePartitioner.cs>)
+     已新增普通 plate-like 件的几何自证通道：
+     - 高 coverage 长向板
+     - 厚板 / outer-side / 长宽比信号
+     - 不再要求上游必须先给出 `web/wall` role
+   - 已对真实 [new-input-layer-draft-run18-batch-wide-candidate](</I:/autoteklasuanfa/.tmpresults/new-input-layer-draft-run18-batch-wide-candidate>) 复跑确认：
+     - `T3-3GL-1`
+       - `CandidatePartCount = 4`
+       - `CandidatePartIds = 58667669,58667675,58667681,58668517`
+       - `HStationCount = 7 / EligibleStationCount = 7`
+       - `CoarseMainClassCode = H`
+       - `CoarseMainClassReasonCode = WEB_FLANGE_SECTION_CONSENSUS`
+     - `foundation-geometry-health-audit`
+       已从：
+       - `MAIN_PLATE_MISSING_FROM_CANDIDATE_SET`
+       收到：
+       - `CANDIDATE_SET_OK`
+   - 当前结论：
+     - 对变截面 `H`，候选层应优先宽收“长向结构板”
+     - 真正要强排除的是明显短小、端部连接、局部加劲件
      - `T3-2YPGL-5`
      - 它在 `run_body_bracket_real_12_orientation_h_v2` 中仍为：
        - `CandidatePartCount = 4`
@@ -582,25 +605,442 @@
      - `SampleTraceConsistency`
    - 目的不是替当前粗分类再加一套隐式判定器，
      而是让后续异常样本先在基础层暴露根因码
+29. `2026-04-29` 已完成定版基线 PR 后的分支收拢：
+   - GitHub PR `#1` 已合并进 `main`
+   - 本地 `main` 已同步到 merge commit `aa144a1`
+   - 已从最新 `main` 新建当前工作分支：
+     - `codex/foundation-health-audit-sidecar-contract-20260429`
+   - 远端已合并旧分支：
+     - `codex/work-variable-section-proof-20260428`
+     已删除
+   - 本地 sidecar 实现草稿暂存保留：
+     - `stash@{1}`：`hold foundation health audit sidecar implementation draft before baseline PR`
+   - 生成物暂存保留：
+     - `stash@{0}`：`hold generated pycache before sidecar branch sync`
+30. `2026-04-30` 已把 V2 当前主题从“只停在输出契约”推进到“collector / workflow 已接线可落盘”：
+   - 已确认输出契约草稿
+     [FOUNDATION_GEOMETRY_HEALTH_AUDIT_OUTPUT_CONTRACT.zh-CN.md](</I:/autoteklasuanfa/FOUNDATION_GEOMETRY_HEALTH_AUDIT_OUTPUT_CONTRACT.zh-CN.md>)
+     可直接作为首版 sidecar 契约
+   - App 层已新增并接入：
+     - [FoundationGeometryHealthAuditModels.cs](</I:/autoteklasuanfa/src/TeklaBodyBracketRecognition.App/FoundationGeometryHealthAuditModels.cs>)
+     - [FoundationGeometryHealthAuditCollector.cs](</I:/autoteklasuanfa/src/TeklaBodyBracketRecognition.App/FoundationGeometryHealthAuditCollector.cs>)
+     - [FoundationGeometryHealthAuditArtifactBuilder.cs](</I:/autoteklasuanfa/src/TeklaBodyBracketRecognition.App/FoundationGeometryHealthAuditArtifactBuilder.cs>)
+     - [FoundationGeometryHealthAuditSerializer.cs](</I:/autoteklasuanfa/src/TeklaBodyBracketRecognition.App/FoundationGeometryHealthAuditSerializer.cs>)
+     - [FoundationGeometryHealthAuditWorkflow.cs](</I:/autoteklasuanfa/src/TeklaBodyBracketRecognition.App/FoundationGeometryHealthAuditWorkflow.cs>)
+   - [DefinitionDrivenSidecarCoordinator.cs](</I:/autoteklasuanfa/src/TeklaBodyBracketRecognition.App/DefinitionDrivenSidecarCoordinator.cs>)
+     当前已并列输出 `foundation-geometry-health-audit.json/.zh-CN.md`
+   - 首版当前只启用：
+     - `AxisConsistency`
+     - `CandidateSetConsistency`
+     - `SampleTraceConsistency`
+   - 并按契约保留：
+     - `SectionFrameConsistency = NOT_EVALUATED`
+     - `TopologyInputConsistency = NOT_EVALUATED`
+   - 已执行：
+     - `dotnet build I:\autoteklasuanfa\TeklaBodyBracketRecognition.sln`
+     - `dotnet run --project I:\autoteklasuanfa\src\TeklaBodyBracketRecognition.App\TeklaBodyBracketRecognition.App.csproj -- I:\xingcaisuanfa\cache\run_body_bracket_real_14\members\member_T2-13GL-9.json I:\autoteklasuanfa\.tmpresults\foundation-health-audit-smoke-20260430-gl9`
+   - 结果：
+     - `0` warning
+     - `0` error
+     - 输出目录
+       [foundation-health-audit-smoke-20260430-gl9](</I:/autoteklasuanfa/.tmpresults/foundation-health-audit-smoke-20260430-gl9>)
+       已真实落出：
+       - `foundation-geometry-health-audit.json`
+       - `foundation-geometry-health-audit.zh-CN.md`
+     - `T2-13GL-9` 在新导出缓存下当前健康检查结果为：
+       - `OverallHealthStatus = PASS`
+       - `AxisConsistency = PASS`
+       - `CandidateSetConsistency = PASS`
+       - `SampleTraceConsistency = PASS`
+31. `2026-04-30` 已把“新输入层”从口头方向收口成独立执行清单：
+   - 新增
+     [NEW_INPUT_LAYER_EXECUTION_CHECKLIST.zh-CN.md](</I:/autoteklasuanfa/NEW_INPUT_LAYER_EXECUTION_CHECKLIST.zh-CN.md>)
+   - 当前定位明确为：
+     - `V3` 候选 / 预研执行面
+     - 暂不替代当前 V2 活跃真源
+   - 当前结论固定为：
+     - 先做新输入层输出契约与最小归一化原型
+     - 先与当前输入链 A/B 对照
+     - 待切换门槛冻结后，再决定是否正式升格为 `V3`
+32. `2026-04-30` 已继续完成“新输入层”阶段 1 的第一版契约草案：
+   - 新增
+     [NEW_INPUT_LAYER_OUTPUT_CONTRACT_DRAFT.zh-CN.md](</I:/autoteklasuanfa/NEW_INPUT_LAYER_OUTPUT_CONTRACT_DRAFT.zh-CN.md>)
+   - 当前草案已明确：
+     - 顶层对象：
+       - `Member`
+       - `NormalizedLongitudinalPath`
+       - `NormalizedPart`
+       - `StationQueryContext`
+     - 字段必须分层：
+       - `RawFact`
+       - `NormalizedRepresentation`
+       - `DerivedAid`
+     - 当前缓存中的：
+       - `AxisSegments / GuidePolyline / MainAxis / BoundingBox / SolidEdges`
+         保持 `RawFact`
+       - `PartRoles / MainClass / OuterSideCandidate / EndProximity`
+         只允许作为 `Hint`
+     - 当前阶段禁止：
+       - 让新输入层直接回灌 `BOX / H / family` 主判定
+   - 当前结论：
+     - 可以开始进入“最小归一化原型”阶段
+     - 但仍应保持并行输出，不替换默认输入链
+33. `2026-04-30` 已继续完成“新输入层”阶段 2 的最小归一化原型接线：
+   - App 层已新增并接入：
+     - [NewInputLayerDraftModels.cs](</I:/autoteklasuanfa/src/TeklaBodyBracketRecognition.App/NewInputLayerDraftModels.cs>)
+     - [NewInputLayerDraftCollector.cs](</I:/autoteklasuanfa/src/TeklaBodyBracketRecognition.App/NewInputLayerDraftCollector.cs>)
+     - [NewInputLayerDraftArtifactBuilder.cs](</I:/autoteklasuanfa/src/TeklaBodyBracketRecognition.App/NewInputLayerDraftArtifactBuilder.cs>)
+     - [NewInputLayerDraftSerializer.cs](</I:/autoteklasuanfa/src/TeklaBodyBracketRecognition.App/NewInputLayerDraftSerializer.cs>)
+     - [NewInputLayerDraftWorkflow.cs](</I:/autoteklasuanfa/src/TeklaBodyBracketRecognition.App/NewInputLayerDraftWorkflow.cs>)
+   - 并已接入：
+     - [DefinitionDrivenSidecarCoordinator.cs](</I:/autoteklasuanfa/src/TeklaBodyBracketRecognition.App/DefinitionDrivenSidecarCoordinator.cs>)
+     - [DefinitionDrivenSidecarCoordinatorResult.cs](</I:/autoteklasuanfa/src/TeklaBodyBracketRecognition.App/DefinitionDrivenSidecarCoordinatorResult.cs>)
+   - 当前首版原型只并行输出：
+     - `NormalizedLongitudinalPath`
+     - `NormalizedPart`
+     - `StationQueryContext`
+   - 已执行：
+     - `dotnet build I:\autoteklasuanfa\TeklaBodyBracketRecognition.sln`
+     - `dotnet run --project I:\autoteklasuanfa\src\TeklaBodyBracketRecognition.App\TeklaBodyBracketRecognition.App.csproj -- I:\xingcaisuanfa\cache\run_body_bracket_real_14\members\member_T2-13GL-9.json I:\autoteklasuanfa\.tmpresults\new-input-layer-draft-smoke-20260430-gl9`
+   - 结果：
+     - `0` warning
+     - `0` error
+     - 输出目录
+       [new-input-layer-draft-smoke-20260430-gl9](</I:/autoteklasuanfa/.tmpresults/new-input-layer-draft-smoke-20260430-gl9>)
+       已真实落出：
+       - `new-input-layer-draft.json`
+       - `new-input-layer-draft.zh-CN.md`
+   - 当前首个 smoke 结论：
+     - `T2-13GL-9` 的路径当前已稳定落成：
+       - `PathModelType = RAW_AXIS_SEGMENTS`
+     - 当前 `18` 个零件中：
+       - `12` 个已落为 `PLATE_BOUNDARY_THICKNESS`
+       - `6` 个已落为 `PATH_SECTION_SWEEP`
+     - 同时也已明确暴露当前缓存边界：
+     - 多个板件仍报 `BOUNDARY_UNRESOLVED`
+     - 多个零件仍报 `THICKNESS_INFERRED_FROM_SIZE`
+     - 这说明新输入层原型已经开始把“当前缓存还缺哪些强语义信息”显式暴露出来
+34. `2026-04-30` 已对新输入层原型继续补三条代表样本 smoke，对照当前输入层缺口的暴露方式：
+   - 输出目录：
+     - [new-input-layer-draft-smoke-20260430-gl23](</I:/autoteklasuanfa/.tmpresults/new-input-layer-draft-smoke-20260430-gl23>)
+     - [new-input-layer-draft-smoke-20260430-gl53](</I:/autoteklasuanfa/.tmpresults/new-input-layer-draft-smoke-20260430-gl53>)
+     - [new-input-layer-draft-smoke-20260430-gl55](</I:/autoteklasuanfa/.tmpresults/new-input-layer-draft-smoke-20260430-gl55>)
+   - 当前早期观察：
+     - `T2-13GL-23`
+       - `PathModelType = RAW_AXIS_SEGMENTS`
+       - `PartModelTypeBreakdown = PLATE_BOUNDARY_THICKNESS 14 / PATH_SECTION_SWEEP 5`
+       - `WarningBreakdown = BOUNDARY_UNRESOLVED 6 / THICKNESS_INFERRED_FROM_SIZE 6`
+     - `T3-2GL-53`
+       - `PathModelType = RAW_AXIS_SEGMENTS`
+       - `PartModelTypeBreakdown = PLATE_BOUNDARY_THICKNESS 70 / PATH_SECTION_SWEEP 4`
+       - `WarningBreakdown = BOUNDARY_UNRESOLVED 5 / THICKNESS_INFERRED_FROM_SIZE 3`
+     - `T3-2GL-55`
+       - `PathModelType = RAW_AXIS_SEGMENTS`
+       - `PartModelTypeBreakdown = PLATE_BOUNDARY_THICKNESS 25 / PATH_SECTION_SWEEP 2`
+       - `WarningBreakdown = BOUNDARY_UNRESOLVED 3`
+   - 当前结论：
+     - 这批代表样本在“路径层”当前都能稳定落到 `RAW_AXIS_SEGMENTS`
+     - 新输入层原型当前真正暴露出的短板，不是在 path，而是在：
+       - 板件 boundary 仍未被可靠参数化
+       - 一部分零件 thickness 仍只能靠尺寸推断
+     - 也就是：
+     - 新原型已经把当前输入层的主要缺口收窄到 `plate boundary / thickness semantics`
+     - 而不是继续停留在“路径到底从哪来”的混沌状态
+35. `2026-04-30` 已在原始导出插件 [I:\xingcaisuanfa](</I:/xingcaisuanfa>) 上完成“旧导出 + 新输入层侧车导出”并行接线：
+   - 仍保留原有：
+     - `member_*.json`
+     - `batch_summary.json`
+   - 同次导出新增：
+     - `member_*.input-layer-draft.json`
+     - `input_layer_draft_summary.json`
+   - 当前实现位置：
+     - [JsonCacheWriter.cs](</I:/xingcaisuanfa/TeklaSectionClassifier/JsonCacheWriter.cs>)
+     - [InputLayerDraftExport.cs](</I:/xingcaisuanfa/TeklaSectionClassifier/InputLayerDraftExport.cs>)
+     - [Tekla2017MemberExtractor.cs](</I:/xingcaisuanfa/TeklaSectionClassifier/Tekla2017MemberExtractor.cs>)
+     - [Models.cs](</I:/xingcaisuanfa/TeklaSectionClassifier/Models.cs>)
+   - 当前新增侧车重点补出的上游事实：
+     - `PartModelType = PLATE_BOUNDARY_THICKNESS / PATH_SECTION_SWEEP`
+     - `ThicknessSource / ThicknessSourceDetail`
+     - `BoundaryLoopKind / BoundarySource / BoundaryPoints`
+     - 完整 `AxisProjection.Start / End / Length / CoverageRatio`
+     - `WarningCodes`
+   - 当前策略：
+     - 只做加法，不替换旧 `member_*.json`
+     - 先让旧链与新侧车长期并行，便于样本对照和后续 importer A/B 消费
+   - 已验证：
+     - `dotnet build I:\xingcaisuanfa\TeklaSectionClassifier.Runner\TeklaSectionClassifier.Runner.csproj`
+     - `0` error
+   - 当前结论：
+     - 新输入层下一阶段已不必停留在“纸面契约”
+     - 可以直接基于 exporter 真实吐出的 sidecar 数据，继续做 importer 对接与样本对照
+36. `2026-04-30` 已继续完成 `autoteklasuanfa` 对 exporter 新侧车的 importer/collector 对接：
+   - 已在：
+     - [NewInputLayerDraftCollector.cs](</I:/autoteklasuanfa/src/TeklaBodyBracketRecognition.App/NewInputLayerDraftCollector.cs>)
+     - [NewInputLayerDraftModels.cs](</I:/autoteklasuanfa/src/TeklaBodyBracketRecognition.App/NewInputLayerDraftModels.cs>)
+     - [XingcaiCacheImporter.cs](</I:/autoteklasuanfa/src/TeklaBodyBracketRecognition.App/XingcaiCacheImporter.cs>)
+     完成增量接线
+   - 当前行为改为：
+     - 优先读取同名 `member_*.input-layer-draft.json`
+     - 找不到时才回退到旧 `member_*.json` 推断逻辑
+   - 当前已真正贯通到 app 输出的新增字段：
+     - `ThicknessSource`
+     - `ThicknessSourceDetail`
+     - `BoundarySource`
+     - `ProjectionStart / ProjectionEnd / CoverageRatio`
+     - exporter 侧 `WarningCodes`
+   - 已验证：
+     - `dotnet build I:\autoteklasuanfa\TeklaBodyBracketRecognition.sln`
+     - `dotnet run --project I:\autoteklasuanfa\src\TeklaBodyBracketRecognition.App\TeklaBodyBracketRecognition.App.csproj -- I:\xingcaisuanfa\cache\run_body_bracket_real_18\members\member_T3-2GL-53.json I:\autoteklasuanfa\.tmpresults\new-input-layer-draft-run18-gl53`
+   - 结果：
+     - `0` warning
+     - `0` error
+     - 输出目录：
+       [new-input-layer-draft-run18-gl53](</I:/autoteklasuanfa/.tmpresults/new-input-layer-draft-run18-gl53>)
+   - 当前 smoke 结论：
+     - app 侧 artifact 已不再只依赖旧链推断
+     - `THICKNESS_INFERRED_FROM_BBOX`
+       与 `BOUNDARY_UNRESOLVED`
+       已能从 exporter 新侧车真实透传到最终 draft artifact
+     - 新输入层下一步可以进入更稳定的 A/B 对照，而不是继续停留在“字段有没有导出来”的阶段
+37. `2026-04-30` 已完成 `run_body_bracket_real_18` 的批量 A/B 首轮确认，并顺手修复目录扫描误吃 sidecar 的批处理问题：
+   - 已修：
+     - [XingcaiCacheImporter.cs](</I:/autoteklasuanfa/src/TeklaBodyBracketRecognition.App/XingcaiCacheImporter.cs>)
+       的 `ResolveMemberFiles(...)`
+       现在会排除：
+       - `member_*.input-layer-draft.json`
+     - 避免批处理时同一个 assembly 因 sidecar/legacy 双读而重复进入 pipeline
+   - 已验证：
+     - `dotnet run --project I:\autoteklasuanfa\src\TeklaBodyBracketRecognition.App\TeklaBodyBracketRecognition.App.csproj -- I:\xingcaisuanfa\cache\run_body_bracket_real_18\members I:\autoteklasuanfa\.tmpresults\new-input-layer-draft-run18-batch`
+   - 结果：
+     - 已完成 `14` 个 assembly 的离线分析
+     - 输出目录：
+       [new-input-layer-draft-run18-batch](</I:/autoteklasuanfa/.tmpresults/new-input-layer-draft-run18-batch>)
+   - 当前 A/B 收敛结论非常明确：
+     - `BOUNDARY_UNRESOLVED = 203`
+     - 其中：
+       - `Beam = 185`
+       - `PolyBeam = 18`
+       - 其它 `PartType = 0`
+     - 说明 exporter 新侧车上线后，剩余边界缺口已高度集中到：
+       - `Beam / PolyBeam`
+   - 当前结论：
+     - plate-like `ContourPlate/BentPlate` 的边界输出已基本够用
+     - 下一轮 exporter 工作不该再平均撒网
+     - 应明确收窄为：
+       - `Beam / PolyBeam` 板件边界参数化
+38. `2026-04-30` 已把“每次跑完批量数据自动生成中文 Excel 结果表”接入离线主流程：
+   - 已新增：
+     - [CoarseClassificationExcelExporter.cs](</I:/autoteklasuanfa/src/TeklaBodyBracketRecognition.App/CoarseClassificationExcelExporter.cs>)
+   - 并已接入：
+     - [OfflineRecognitionBatchRunner.cs](</I:/autoteklasuanfa/src/TeklaBodyBracketRecognition.App/OfflineRecognitionBatchRunner.cs>)
+   - 当前行为：
+     - 每次 `OfflineRecognitionBatchRunner` 完成后
+     - 都会在输出目录自动生成：
+       - `粗分类结果.xlsx`
+   - 当前 Excel 固定包含：
+     - `粗分类结果表`
+     - `边界缺口汇总`
+     - `边界缺口明细`
+   - 当前表头已统一改为中文优先，便于直接人工核对：
+     - `来源主类中文`
+     - `当前粗分类中文`
+     - `是否与来源一致`
+     - `判定原因中文`
+     - `边界缺口数`
+     - `主要缺口类型`
+   - 已验证：
+     - `dotnet run --project I:\autoteklasuanfa\src\TeklaBodyBracketRecognition.App\TeklaBodyBracketRecognition.App.csproj -- I:\xingcaisuanfa\cache\run_body_bracket_real_18\members I:\autoteklasuanfa\.tmpresults\new-input-layer-draft-run18-batch-autoexcel`
+   - 输出目录已真实落出：
+       [粗分类结果.xlsx](</I:/autoteklasuanfa/.tmpresults/new-input-layer-draft-run18-batch-autoexcel/粗分类结果.xlsx>)
+39. `2026-04-30` 已把 `T3-2YPGL-5` 的“延长线可围合但侧壁未进外圈支持集”根因收口到拓扑/闭环衔接层：
+   - 已确认此前真正把 `YPGL-5` 判坏的不是候选集缺失，也不是 sample-level 截面不闭合，而是：
+     - `SectionTopologyAnalyzer`
+       先按 `TouchesEnvelope(...)` 只把“直接碰到端点包络”的 trace 认作 `OuterEnvelopeTraceIds`
+     - `SectionClosedLoopEvidence.HasTrueClosedLoop(...)`
+       又只拿这批 `envelopeSegments` 去跑 `HasExtendedLineLoop(...)`
+     - 于是 `YPGL-5` 两块侧壁虽然在“代表线延长后”可以与上下板形成真实围合，
+       但因为端点本身略缩进，仍被长期留在 `InternalTraceIds`
+   - 当前已在：
+     - [SectionClosedLoopEvidence.cs](</I:/autoteklasuanfa/src/TeklaBodyBracketRecognition.Core/Algorithms/SectionClosedLoopEvidence.cs>)
+     - [SectionTopologyAnalyzer.cs](</I:/autoteklasuanfa/src/TeklaBodyBracketRecognition.Core/Algorithms/SectionTopologyAnalyzer.cs>)
+     完成收口：
+     - `HasTrueClosedLoop(...)` 不再在 `envelopeSegments < 4` 时直接失败
+     - 当前会在 body-candidate 全集上继续尝试 `SupportsExtendedLineLoop(...)`
+     - 拓扑层若检测到 body-candidate 全集可形成 extended-line loop，
+       会把这批支持线作为真实外圈支持集，而不再硬锁死在端点包络触边集合
+   - 已对真实
+     [new-input-layer-draft-run18-extended-loop-support-v1](</I:/autoteklasuanfa/.tmpresults/new-input-layer-draft-run18-extended-loop-support-v1>)
+     复跑确认：
+     - `T3-2YPGL-5`
+       - `CandidatePartCount = 4`
+       - `BoxStationCount = 5 / EligibleStationCount = 5`
+       - `ClosedLoopStationCount = 5`
+       - `CoarseMainClassCode = BOX`
+       - `CoarseMainClassReasonCode = MULTI_WALL_CLOSED_LOOP_CONSENSUS`
+     - 同批对照：
+       - `T3-1HXZ-8` 仍保持 `TOPOLOGY_CONSENSUS_NOT_REACHED`
+       - `T3-3GL-1` 仍保持 `H + WEB_FLANGE_SECTION_CONSENSUS`
+   - 当前结论：
+     - 这次修的是“围合支持集如何从代表线恢复”这条更深的共性口子
+     - 它能覆盖一类“端点包络看起来未闭、但代表线延长后真实闭合”的异形箱体
+     - 但还不能承诺“所有异形截面”都已一次性彻底正确表达，后续仍需继续用更多 `BOX / 非 BOX` 样本压回归面
+40. `2026-04-30` 已把“路径+截面 / 边界+厚度 / 退化近似 / 表达等级 / 失真风险”正式落到新输入层工件：
+   - 已在：
+     - [NewInputLayerDraftModels.cs](</I:/autoteklasuanfa/src/TeklaBodyBracketRecognition.App/NewInputLayerDraftModels.cs>)
+     - [NewInputLayerDraftCollector.cs](</I:/autoteklasuanfa/src/TeklaBodyBracketRecognition.App/NewInputLayerDraftCollector.cs>)
+     - [NewInputLayerDraftArtifactBuilder.cs](</I:/autoteklasuanfa/src/TeklaBodyBracketRecognition.App/NewInputLayerDraftArtifactBuilder.cs>)
+     - [CoarseClassificationExcelExporter.cs](</I:/autoteklasuanfa/src/TeklaBodyBracketRecognition.App/CoarseClassificationExcelExporter.cs>)
+     完成收口
+   - 当前行为改为：
+     - 不再只输出 `PartModelType + WarningCodes`
+     - 每个零件都会显式给出：
+       - `RepresentationKind`
+       - `RepresentationLevel`
+       - `DistortionRiskCode`
+       - `DistortionRiskReasons`
+       - `DegradationReasonCodes`
+   - 当前首版口径：
+     - 能形成真实 `path + section` 的，落 `PATH_SECTION_SWEEP`
+     - 能形成真实 `boundary + thickness` 的，落 `PLATE_BOUNDARY_THICKNESS`
+     - 只有边界/截面拿不全时，才显式落：
+       - `APPROX_PATH_SECTION_SWEEP`
+       - `APPROX_BOUNDARY_THICKNESS`
+       - `TRACE_ONLY_FALLBACK`
+   - 已对真实
+     [new-input-layer-draft-run18-representation-v1](</I:/autoteklasuanfa/.tmpresults/new-input-layer-draft-run18-representation-v1>)
+     复跑确认：
+     - `dotnet build I:\autoteklasuanfa\TeklaBodyBracketRecognition.sln`
+       - `0` warning
+       - `0` error
+     - `run_body_bracket_real_18` 批量输出中：
+       - `RepresentationKindBreakdown`
+         - `PLATE_BOUNDARY_THICKNESS = 382`
+         - `APPROX_BOUNDARY_THICKNESS = 203`
+         - `PATH_SECTION_SWEEP = 67`
+       - `RepresentationLevelBreakdown`
+         - `EXACT = 449`
+         - `APPROXIMATE = 203`
+       - `DistortionRiskBreakdown`
+         - `LOW = 449`
+         - `HIGH = 203`
+     - `T3-2YPGL-5` 当前已能直接区分：
+       - `ContourPlate` 主板：
+         - `边界+厚度 / 精确表达 / 低风险`
+       - `Beam / PolyBeam` 且边界仍未补齐的板件：
+         - `近似边界+厚度 / 高风险`
+   - 当前 Excel 也已同步补强：
+     - 主表新增：
+       - `精确/近精确数`
+       - `近似/退化数`
+       - `高风险数`
+     - 新增工作表：
+       - `表达等级汇总`
+   - 当前结论：
+     - “失真”不再只是藏在 warning 里
+     - 已变成可直接核对的主字段
+   - 下一步真正该补的是 exporter 侧 `Beam / PolyBeam` richer boundary/section 语义，而不是让下游继续隐式猜
+41. `2026-04-30` 已把 `T3-1HXZ-8` 这类“典型钢板 + 窄边板/包边板”从粗分类空档里收进 `PRIMARY_PLATE_BODY`：
+   - 已确认该样本不是输入层问题：
+     - `foundation-geometry-health-audit = PASS`
+     - `CandidatePartCount = 5`
+     - `PriorityStationCount = 5`
+     - 轴线 / 候选集 / trace 都已通过
+   - 真正根因是：
+     - [CoarseMainClassObservationCollector.cs](</I:/autoteklasuanfa/src/TeklaBodyBracketRecognition.App/CoarseMainClassObservationCollector.cs>)
+       旧逻辑只允许：
+       - `BOX`
+       - `H`
+       - `candidatePartCount <= 2` 的 `PRIMARY_PLATE_BODY`
+     - 像 `T3-1HXZ-8` 这种：
+       - `1` 块绝对主导大板
+       - `+ 4` 块窄边板/包边板
+       - 虽然工程语义上明显仍是单主板体
+       - 但因为 `candidatePartCount = 5`
+         会长期落到 `TOPOLOGY_CONSENSUS_NOT_REACHED`
+   - 当前已新增保守口径：
+     - 当多数切片满足：
+       - 存在 `1` 块绝对主导的大板
+       - 其余板件宽度显著更小
+       - 且大多附着在主板端部/边部
+     - 允许仍判为：
+       - `PRIMARY_PLATE_BODY`
+       - `ReasonCode = DOMINANT_PRIMARY_PLATE_WITH_EDGE_RETURNS`
+   - 已对真实
+     [new-input-layer-draft-run18-hxz8-primaryplate-v1](</I:/autoteklasuanfa/.tmpresults/new-input-layer-draft-run18-hxz8-primaryplate-v1>)
+     复跑确认：
+     - `T3-1HXZ-8`
+       - `PrimaryPlateStationCount = 5`
+       - `PrimaryPlateStationRatio = 1.0`
+       - `CoarseMainClassCode = PRIMARY_PLATE_BODY`
+       - `CoarseMainClassSubtypeCode = CONST_PRIMARY_PLATE`
+       - `CoarseMainClassReasonCode = DOMINANT_PRIMARY_PLATE_WITH_EDGE_RETURNS`
+   - 当前说明：
+     - 这步修的是“单主板 + 窄边板”这一类典型钢板体的粗分类表达缺口
+     - 不是把 `HXZ` 一揽子抬成单板
+     - 也没有放宽 `BOX / H` 判据
+42. `2026-04-30` 已继续把“单主板 + 多块边缘附属板”的粗分类口径从样本特征收口到更抽象的结构条件，并在 `run20` 上完成整组验证：
+   - 已确认上一轮 `DOMINANT_PRIMARY_PLATE_WITH_EDGE_RETURNS`
+     的真正窄口子不是“小板数量”，而是两个过强假设：
+     - 主导板占全部 trace 宽度比例必须 `>= 0.68`
+     - 次级板件默认应与主导板方向近似平行
+   - `T3-1HXZ-1 / 5 / 6 / 9`
+     这几条在 `run20` 上已证明：
+     - 候选集仍是 `5` 件
+     - 轴线 / 候选 / trace 均正常
+     - 真实失败点只是：
+       - `DominantShare ≈ 0.663`
+       - 且主导板是斜放代表线
+       - 之前被过窄阈值卡在外面
+   - 同时也已确认：
+     - 若只简单下调占比阈值
+     - 会把 `T3-2MJ-13`
+       这类“主板 + 少量边板”的非目标样本误吞进来
+   - 当前已把口径收到：
+     - 存在 `1` 块主导板
+     - 次级板件宽度显著更小
+     - 次级板件在主导板两端/边缘形成附着
+     - 且必须有至少 `3` 块独立次级边缘附属板
+   - 已对真实
+     [new-input-layer-draft-run20-primaryplate-v3](</I:/autoteklasuanfa/.tmpresults/new-input-layer-draft-run20-primaryplate-v3>)
+     复跑确认：
+     - `T3-1HXZ-1 / 2 / 3 / 5 / 6 / 7 / 8 / 9`
+       已全部回到：
+       - `PRIMARY_PLATE_BODY`
+       - 其中 `1 / 2 / 3 / 5 / 6 / 7 / 8 / 9`
+         为 `DOMINANT_PRIMARY_PLATE_WITH_EDGE_RETURNS`
+       - `4`
+         仍为 `SINGLE_PLATE_STATION_MAJORITY`
+     - `T3-2MJ-13`
+       仍保持：
+       - `TOPOLOGY_CONSENSUS_NOT_REACHED`
+       - 未被该规则误吞
+   - 当前说明：
+     - 这一步已经把“单主板 + 多块边缘附属板”从具体样本数目抽象成了更稳定的组织关系
+     - 后续若再扩样本，优先验证：
+       - `3` 块边板
+       - 非对称边板
+       - 更短主板
+       这些变体是否仍能稳定命中
 
 ---
 
 ## 当前下一步
 
-1. 把 [FOUNDATION_GEOMETRY_HEALTH_AUDIT_PLAN.zh-CN.md](</I:/autoteklasuanfa/FOUNDATION_GEOMETRY_HEALTH_AUDIT_PLAN.zh-CN.md>) 作为当前主题真源。
-2. 第一轮实现只落基础健康检查 sidecar，不改粗分类主判定。
-3. 第一批检查项固定为：
-   - `AxisConsistency`
-   - `CandidateSetConsistency`
-   - `SampleTraceConsistency`
-4. 第一轮对照样本固定为：
-   - `T3-2GL-53 / 55`
-   - `T2-13GL-9 / 10 / 16 / 21 / 24`
-   - `T2-13GL-23`
-5. 首轮验收要求：
-   - 先能明确报出根因所在层级
-   - 再决定是否继续扩 `SectionFrameConsistency / TopologyInputConsistency`
-6. 当前阶段继续冻结：
+1. 以 [PROJECT_TASKLIST_V2.zh-CN.md](</I:/autoteklasuanfa/PROJECT_TASKLIST_V2.zh-CN.md>) 作为当前执行顺序真源。
+2. 新输入层当前已具备 exporter 侧真实并行输出，不再只停留在 app 内 draft 原型。
+3. 下一步优先补 exporter 侧 richer 语义，而不是再扩 importer 猜测：
+   - 重点只收窄到：
+     - `Beam / PolyBeam`
+   - 优先新增或补强：
+     - `RepresentationKind / RepresentationLevel / DistortionRiskCode`
+     - 可直接支撑 `path + section` 或 `boundary + thickness` 的显式字段
+4. 第一轮 exporter 代表样本继续固定为：
+   - `T3-1GKZ-6`
+   - `T3-5GKZ-5`
+   - `T3-2GKL-6`
+   - `T3-2YPGL-9`
+5. 当前阶段继续冻结：
+   - 不直接替换旧输入链
    - 不回到 proof / 家族映射层
    - 不把 audit 结果回灌成新的粗分类借力
 

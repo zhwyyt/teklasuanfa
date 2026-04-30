@@ -14,6 +14,10 @@ internal static class DefinitionDrivenSidecarCoordinator
             DefinitionClauseDecisionFullRunSourceCollector.CollectRepresentativeParts(
                 artifacts.BodyMaterialSummaries,
                 artifacts.RealInputCoreBodyProof);
+        var foundationGeometryHealthAuditRows =
+            FoundationGeometryHealthAuditCollector.Collect(artifacts);
+        var newInputLayerDraftRows =
+            NewInputLayerDraftCollector.Collect(artifacts);
         var coarseMainClassObservationRows =
             CoarseMainClassObservationCollector.Collect(artifacts);
         var bodyFamilyProofRows =
@@ -30,6 +34,12 @@ internal static class DefinitionDrivenSidecarCoordinator
                 outputDirectory,
                 definitionClauseDecisionAssemblies,
                 definitionClauseDecisionRepresentativeParts),
+            FoundationGeometryHealthAudit = FoundationGeometryHealthAuditWorkflow.Run(
+                outputDirectory,
+                foundationGeometryHealthAuditRows),
+            NewInputLayerDraft = NewInputLayerDraftWorkflow.Run(
+                outputDirectory,
+                newInputLayerDraftRows),
             CoarseMainClassObservation = CoarseMainClassObservationWorkflow.Run(
                 outputDirectory,
                 coarseMainClassObservationRows),

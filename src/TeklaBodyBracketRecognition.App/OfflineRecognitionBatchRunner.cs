@@ -32,8 +32,10 @@ internal static class OfflineRecognitionBatchRunner
         _ = DefinitionDrivenSidecarCoordinator.Run(outputDirectory, artifacts);
 
         BatchArtifactWriter.Write(outputDirectory, artifacts, jsonOptions);
+        var excelPath = CoarseClassificationExcelExporter.Generate(outputDirectory);
 
         output.WriteLine($"已完成 {jobs.Count} 个 assembly 的离线分析。输出目录: {outputDirectory}");
+        output.WriteLine($"粗分类 Excel: {excelPath}");
         return 0;
     }
 

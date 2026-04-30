@@ -109,6 +109,7 @@ internal static class XingcaiCacheImporter
 
         var directFiles = Directory
             .GetFiles(directory, "member_*.json", SearchOption.TopDirectoryOnly)
+            .Where(static path => !path.EndsWith(".input-layer-draft.json", StringComparison.OrdinalIgnoreCase))
             .OrderBy(path => path, StringComparer.OrdinalIgnoreCase)
             .ToArray();
         if (directFiles.Length > 0)
@@ -127,7 +128,10 @@ internal static class XingcaiCacheImporter
             yield break;
         }
 
-        foreach (var file in Directory.GetFiles(membersDirectory, "member_*.json", SearchOption.TopDirectoryOnly).OrderBy(path => path, StringComparer.OrdinalIgnoreCase))
+        foreach (var file in Directory
+                     .GetFiles(membersDirectory, "member_*.json", SearchOption.TopDirectoryOnly)
+                     .Where(static path => !path.EndsWith(".input-layer-draft.json", StringComparison.OrdinalIgnoreCase))
+                     .OrderBy(path => path, StringComparer.OrdinalIgnoreCase))
         {
             yield return file;
         }
@@ -798,6 +802,8 @@ internal sealed class XingcaiMemberIdentity
 
 internal sealed class XingcaiAxisDefinition
 {
+    public XingcaiPoint3D? Origin { get; set; }
+
     public XingcaiPoint3D? Direction { get; set; }
 
     public double Length { get; set; }
@@ -855,7 +861,13 @@ internal sealed class XingcaiLongitudinalAxisSegment
 
 internal sealed class XingcaiAxisProjection
 {
+    public double Start { get; set; }
+
+    public double End { get; set; }
+
     public double Length { get; set; }
+
+    public double CoverageRatio { get; set; }
 }
 
 internal sealed class XingcaiGeometryHints
@@ -878,6 +890,8 @@ internal sealed class XingcaiEndProximity
 
 internal sealed class XingcaiCoordinateSystem
 {
+    public XingcaiPoint3D? Origin { get; set; }
+
     public XingcaiPoint3D? X { get; set; }
 
     public XingcaiPoint3D? Y { get; set; }

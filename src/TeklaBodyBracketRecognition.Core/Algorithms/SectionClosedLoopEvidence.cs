@@ -33,22 +33,25 @@ internal static class SectionClosedLoopEvidence
         var envelopeSegments = bodyCandidates
             .Where(item => TouchesEnvelope(item, minY, maxY, minZ, maxZ, tolerance))
             .ToArray();
-        if (envelopeSegments.Length < 4)
+        if (envelopeSegments.Length >= 4)
         {
-            return false;
+            if (HasEndpointCycle(envelopeSegments, minY, maxY, minZ, maxZ, tolerance))
+            {
+                return true;
+            }
+
+            if (HasExtendedLineLoop(envelopeSegments, minY, maxY, minZ, maxZ, tolerance))
+            {
+                return true;
+            }
+
+            if (HasEnvelopeBoundaryLoop(envelopeSegments, minY, maxY, minZ, maxZ, tolerance))
+            {
+                return true;
+            }
         }
 
-        if (HasEndpointCycle(envelopeSegments, minY, maxY, minZ, maxZ, tolerance))
-        {
-            return true;
-        }
-
-        if (HasExtendedLineLoop(envelopeSegments, minY, maxY, minZ, maxZ, tolerance))
-        {
-            return true;
-        }
-
-        return HasEnvelopeBoundaryLoop(envelopeSegments, minY, maxY, minZ, maxZ, tolerance);
+        return SupportsExtendedLineLoop(bodyCandidates, minY, maxY, minZ, maxZ, tolerance);
     }
 
     public static bool TouchesEnvelope(
@@ -60,6 +63,27 @@ internal static class SectionClosedLoopEvidence
         double tolerance)
     {
         return GetTouchedSides(segment, minY, maxY, minZ, maxZ, tolerance) != EnvelopeSide.None;
+    }
+
+    public static bool SupportsExtendedLineLoop(
+        IReadOnlyList<SectionTraceCleanSegment> segments,
+        double minY,
+        double maxY,
+        double minZ,
+        double maxZ,
+        double tolerance)
+    {
+        if (segments.Count < 4)
+        {
+            return false;
+        }
+
+        if (!HasMultipleDirectionFamilies(segments, tolerance))
+        {
+            return false;
+        }
+
+        return HasExtendedLineLoop(segments, minY, maxY, minZ, maxZ, tolerance);
     }
 
     private static bool HasEndpointCycle(

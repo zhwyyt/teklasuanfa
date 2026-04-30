@@ -14,6 +14,7 @@ internal static class CoarseMainClassObservationCollector
         bool IsBox,
         bool IsH,
         bool IsPrimaryPlate,
+        bool IsDominantPrimaryPlate,
         bool HasClosedLoop,
         int DistinctPartCount,
         int CandidateSegmentCount,
@@ -195,7 +196,7 @@ internal static class CoarseMainClassObservationCollector
 
             if (candidateSegments.Length == 0)
             {
-                observations.Add(new StationObservation(false, false, false, false, false, 0, 0, 0d, 0d));
+                observations.Add(new StationObservation(false, false, false, false, false, false, 0, 0, 0d, 0d));
                 continue;
             }
 
@@ -221,9 +222,10 @@ internal static class CoarseMainClassObservationCollector
                 hasUpperHorizontal &&
                 hasLowerHorizontal &&
                 hasCentralVertical;
-            var isTopologyH = HasHLikeTopology(candidateSegments, envelopeWidth, envelopeHeight);
+            var isTopologyH = HasHLikeTopology(candidateSegments, envelopeWidth, envelopeHeight, envelopeCenterY, envelopeCenterZ);
             var isH = !hasClosedLoop && (isAxisAlignedH || isTopologyH);
-            var isPrimaryPlate = !isBox && !isH && distinctPartCount <= 2;
+            var isDominantPrimaryPlate = !isBox && !isH && HasDominantPrimaryPlateTopology(candidateSegments, envelopeWidth, envelopeHeight);
+            var isPrimaryPlate = !isBox && !isH && (distinctPartCount <= 2 || isDominantPrimaryPlate);
 
             observations.Add(
                 new StationObservation(
@@ -231,6 +233,7 @@ internal static class CoarseMainClassObservationCollector
                     isBox,
                     isH,
                     isPrimaryPlate,
+                    isDominantPrimaryPlate,
                     hasClosedLoop,
                     distinctPartCount,
                     candidateSegments.Length,
@@ -244,7 +247,9 @@ internal static class CoarseMainClassObservationCollector
     private static bool HasHLikeTopology(
         IReadOnlyList<SectionTraceCleanSegment> segments,
         double envelopeWidth,
-        double envelopeHeight)
+        double envelopeHeight,
+        double envelopeCenterY,
+        double envelopeCenterZ)
     {
         if (segments.Count < 3)
         {
@@ -254,6 +259,7 @@ internal static class CoarseMainClassObservationCollector
         var primaryGapFloor = Math.Max(40d, Math.Min(envelopeWidth, envelopeHeight) * 0.10d);
         var centerTolerance = Math.Max(35d, Math.Min(envelopeWidth, envelopeHeight) * 0.12d);
         var spanTolerance = Math.Max(20d, Math.Min(envelopeWidth, envelopeHeight) * 0.05d);
+        var envelopeCenterTolerance = Math.Max(45d, Math.Min(envelopeWidth, envelopeHeight) * 0.16d);
 
         foreach (var seed in segments)
         {
@@ -287,6 +293,12 @@ internal static class CoarseMainClassObservationCollector
             }
 
             var familyCenterOffset = (minOffset + maxOffset) * 0.5d;
+            var envelopeCenterOffset = Project(envelopeCenterY, envelopeCenterZ, normalY, normalZ);
+            if (Math.Abs(familyCenterOffset - envelopeCenterOffset) > envelopeCenterTolerance)
+            {
+                continue;
+            }
+
             var outerPlates = parallelFamily
                 .Where(
                     item =>
@@ -303,6 +315,14 @@ internal static class CoarseMainClassObservationCollector
 
             var lowerOuter = outerPlates.First();
             var upperOuter = outerPlates.Last();
+            var lowerOuterOffset = Project(lowerOuter.CenterY, lowerOuter.CenterZ, normalY, normalZ);
+            var upperOuterOffset = Project(upperOuter.CenterY, upperOuter.CenterZ, normalY, normalZ);
+            if (lowerOuterOffset >= envelopeCenterOffset - (primaryGapFloor * 0.15d) ||
+                upperOuterOffset <= envelopeCenterOffset + (primaryGapFloor * 0.15d))
+            {
+                continue;
+            }
+
             var lowerCenterAlong = Project(lowerOuter.CenterY, lowerOuter.CenterZ, seedDirectionY, seedDirectionZ);
             var upperCenterAlong = Project(upperOuter.CenterY, upperOuter.CenterZ, seedDirectionY, seedDirectionZ);
             var minOuterAlong = Math.Min(lowerCenterAlong, upperCenterAlong);
@@ -433,6 +453,23 @@ internal static class CoarseMainClassObservationCollector
                 "多数切片由单主板或双板窄组合主导");
         }
 
+        var dominantPrimaryPlateRatio = Ratio(stations.Count(item => item.IsDominantPrimaryPlate), eligibleStationCount);
+        if (candidatePartCount >= 3 && dominantPrimaryPlateRatio >= 0.60d)
+        {
+            var (subtypeCode, subtypeLabelZh) = familyVariability.IsVariable
+                ? ("VARIABLE_PRIMARY_PLATE", "变化截面主板体")
+                : ("CONST_PRIMARY_PLATE", "恒定截面主板体");
+            var confidence = Math.Min(0.95d, 0.55d + dominantPrimaryPlateRatio * 0.30d);
+            return (
+                "PRIMARY_PLATE_BODY",
+                "单主板主体",
+                confidence,
+                subtypeCode,
+                subtypeLabelZh,
+                "DOMINANT_PRIMARY_PLATE_WITH_EDGE_RETURNS",
+                "多数切片存在一块绝对主导的大板，其余仅为窄边板或包边板");
+        }
+
         return (
             string.Empty,
             string.Empty,
@@ -441,6 +478,99 @@ internal static class CoarseMainClassObservationCollector
             string.Empty,
             "TOPOLOGY_CONSENSUS_NOT_REACHED",
             "多切片还没有形成稳定的粗拓扑共识");
+    }
+
+    private static bool HasDominantPrimaryPlateTopology(
+        IReadOnlyList<SectionTraceCleanSegment> segments,
+        double envelopeWidth,
+        double envelopeHeight)
+    {
+        if (segments.Count < 3)
+        {
+            return false;
+        }
+
+        var ordered = segments
+            .OrderByDescending(item => item.WidthLength)
+            .ToArray();
+        var dominant = ordered[0];
+        if (dominant.WidthLength < Math.Max(180d, Math.Max(envelopeWidth, envelopeHeight) * 0.60d))
+        {
+            return false;
+        }
+
+        var secondary = ordered.Skip(1).ToArray();
+        if (secondary.Length == 0)
+        {
+            return false;
+        }
+
+        var distinctSecondaryPartCount = secondary
+            .Select(item => item.PartId)
+            .Distinct()
+            .Count();
+        var totalWidth = ordered.Sum(item => item.WidthLength);
+        var dominantWidthShare = dominant.WidthLength / Math.Max(1d, totalWidth);
+        if (dominantWidthShare < 0.58d)
+        {
+            return false;
+        }
+
+        var secondaryWidthCeiling = Math.Max(80d, dominant.WidthLength * 0.18d);
+        if (secondary.Any(item => item.WidthLength > secondaryWidthCeiling))
+        {
+            return false;
+        }
+
+        if (!TryGetSegmentDirection(dominant, out var dominantDirY, out var dominantDirZ))
+        {
+            return false;
+        }
+
+        var startBandTolerance = Math.Max(50d, dominant.WidthLength * 0.10d);
+        var startAlong = Project(dominant.StartY, dominant.StartZ, dominantDirY, dominantDirZ);
+        var endAlong = Project(dominant.EndY, dominant.EndZ, dominantDirY, dominantDirZ);
+        var minAlong = Math.Min(startAlong, endAlong);
+        var maxAlong = Math.Max(startAlong, endAlong);
+
+        var edgeAttachedCount = secondary.Count(
+            item =>
+            {
+                var centerAlong = Project(item.CenterY, item.CenterZ, dominantDirY, dominantDirZ);
+                return Math.Abs(centerAlong - minAlong) <= startBandTolerance ||
+                       Math.Abs(centerAlong - maxAlong) <= startBandTolerance;
+            });
+
+        if (edgeAttachedCount < Math.Max(2, secondary.Length / 2))
+        {
+            return false;
+        }
+
+        var lineAttachmentTolerance = Math.Max(90d, Math.Min(envelopeWidth, envelopeHeight) * 0.45d);
+        var lineAttachedCount = secondary.Count(
+            item =>
+            {
+                var offset = Math.Abs(
+                    ((item.CenterY - dominant.CenterY) * dominantDirZ) -
+                    ((item.CenterZ - dominant.CenterZ) * dominantDirY));
+                return offset <= lineAttachmentTolerance;
+            });
+
+        if (lineAttachedCount < Math.Max(2, secondary.Length / 2))
+        {
+            return false;
+        }
+
+        var edgeAttachmentRatio = edgeAttachedCount / (double)secondary.Length;
+        var lineAttachmentRatio = lineAttachedCount / (double)secondary.Length;
+        var secondaryPartBonus = Math.Min(0.08d, distinctSecondaryPartCount * 0.02d);
+        var evidenceScore =
+            dominantWidthShare +
+            (edgeAttachmentRatio * 0.14d) +
+            (lineAttachmentRatio * 0.10d) +
+            secondaryPartBonus;
+
+        return evidenceScore >= 0.78d;
     }
 
     private static (bool IsVariable, double VariationScore) ResolveFamilyVariability(

@@ -124,11 +124,6 @@ public sealed class SectionTraceCleaner
 
     private static bool IsNearDuplicate(SectionTraceSegment left, SectionTraceSegment right, double tolerance)
     {
-        if (left.PartId == right.PartId)
-        {
-            return true;
-        }
-
         if (left.PartitionClass != right.PartitionClass)
         {
             return false;
